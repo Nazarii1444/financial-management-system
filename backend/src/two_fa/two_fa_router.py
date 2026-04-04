@@ -35,7 +35,7 @@ async def setup_2fa(
     user.twofa_secret = secret
     await session.commit()
 
-    uri = pyotp.totp.TOTP(secret).provisioning_uri(name=user.email, issuer_name="HomiakFinance")
+    uri = pyotp.totp.TOTP(secret).provisioning_uri(name=user.email, issuer_name="FinanceSystem")
     buf = io.BytesIO()
     qrcode.make(uri).save(buf, format="PNG")
     qr_base64 = base64.b64encode(buf.getvalue()).decode()

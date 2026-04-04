@@ -1,11 +1,11 @@
-# Homiak Finance
+# Financial Management API
 
 ---
 
 ## Installation
 1. Clone the repo:
 ```bash
-git clone https://github.com/Nazarii1444/HomiakFinance.git
+git clone https://github.com/Nazarii1444/financial-management-system.git
 ```
 
 2. Create an environment:
@@ -29,7 +29,7 @@ source .venv/bin/activate (mac/linux)
 pip install -r requirements.txt
 ```
 
-5. Create a DB named `homiakdb` in pgadmin4.
+5. Create a DB named `financialdb` in pgadmin4.
 
 6. Init alembic:
 ```bash
@@ -43,7 +43,7 @@ POSTGRES_USER=postgres
 POSTGRES_PASSWORD=postgres
 DB_HOST=localhost
 DB_PORT=5432
-DB_NAME=homiakdb
+DB_NAME=financialdb
 ```
 
 8. Change `alembic/env.py` to the following code:
