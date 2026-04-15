@@ -437,6 +437,9 @@ export const translations = {
       noData: 'No data available',
       error: 'An error occurred',
       close: 'Close',
+      upgradeToPro: 'Upgrade to Pro',
+      upgradeProDesc: 'Get AI insights, unlimited budgets & more',
+      upgradeNow: 'Upgrade Now',
     },
 
     // Header/TopBar
@@ -963,6 +966,9 @@ export const translations = {
       noData: 'Немає даних',
       error: 'Сталася помилка',
       close: 'Закрити',
+      upgradeToPro: 'Оновити до Pro',
+      upgradeProDesc: 'ШІ-аналітика, необмежені бюджети та інші переваги',
+      upgradeNow: 'Оновити зараз',
     },
 
     // Header/TopBar
