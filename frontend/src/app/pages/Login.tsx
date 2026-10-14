@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Eye, EyeOff, Mail, Lock } from 'lucide-react';
-import { Link, useNavigate } from 'react-router';
+import { Link, useLocation, useNavigate } from 'react-router';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
@@ -9,20 +9,24 @@ import { toast } from 'sonner';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../i18n/LanguageContext';
 import { motion } from 'motion/react';
+import { ApiError, oauthLoginUrl } from '../lib/api';
+import { errorMessage } from '../lib/errors';
 
-// Mock credentials for testing
-const MOCK_CREDENTIALS = {
-  email: 'demo@financehub.com',
-  password: 'Demo123!',
+// User created by backend/scripts/seed.py — shown only in local development
+const DEMO_CREDENTIALS = {
+  email: 'alice@example.com',
+  password: 'password123',
 };
 
 export function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [remember, setRemember] = useState(true);
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
   const { login } = useAuth();
   const { t, language, setLanguage } = useLanguage();
 
@@ -42,53 +46,49 @@ export function Login() {
 
     if (!password) {
       newErrors.password = t.auth.passwordRequired;
-    } else if (password.length < 6) {
-      newErrors.password = t.auth.passwordMinLength;
     }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    
+
     if (!validateForm()) {
       return;
     }
 
     setIsLoading(true);
-
-    // Simulate API call
-    setTimeout(() => {
-      if (email === MOCK_CREDENTIALS.email && password === MOCK_CREDENTIALS.password) {
-        // Check if 2FA is enabled for this user (mock check)
-        const user2FAEnabled = true; // In real app, this comes from API
-        
-        if (user2FAEnabled) {
-          toast.success(t.auth.credentialsVerified);
-          navigate('/2fa', { state: { email } });
-        } else {
-          login(); // Update auth state
-          toast.success(t.auth.loginSuccess);
-          navigate('/');
-        }
+    try {
+      const result = await login(email, password, remember);
+      if (result.requires2fa) {
+        toast.success(t.auth.credentialsVerified);
+        navigate('/2fa', { state: { email, tempToken: result.tempToken, remember } });
       } else {
-        toast.error(t.auth.invalidCredentialsError);
-        setErrors({ 
-          email: t.auth.invalidCredentials,
-          password: t.auth.invalidCredentials
-        });
+        toast.success(t.auth.loginSuccess);
+        navigate((location.state as { from?: string } | null)?.from || '/', { replace: true });
       }
+    } catch (err) {
+      const message = errorMessage(err, t);
+      toast.error(message);
+      if (err instanceof ApiError && err.status === 400) {
+        setErrors({ email: message, password: message });
+      }
+    } finally {
       setIsLoading(false);
-    }, 1000);
+    }
   };
 
   const fillDemoCredentials = () => {
-    setEmail(MOCK_CREDENTIALS.email);
-    setPassword(MOCK_CREDENTIALS.password);
+    setEmail(DEMO_CREDENTIALS.email);
+    setPassword(DEMO_CREDENTIALS.password);
     setErrors({});
     toast.info(t.auth.demoCredentialsFilled);
+  };
+
+  const startOAuth = (provider: 'google' | 'github') => {
+    window.location.href = oauthLoginUrl(provider);
   };
 
   const languages = [
@@ -159,6 +159,7 @@ export function Login() {
         </div>
 
         {/* Demo Credentials Info */}
+        {import.meta.env.DEV && (
         <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
           <div className="flex items-start gap-3">
             <svg className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -168,10 +169,10 @@ export function Login() {
               <h4 className="text-sm font-medium text-blue-900 mb-1">{t.auth.demoAccount}</h4>
               <p className="text-xs text-blue-700 mb-2">{t.auth.demoDescription}</p>
               <div className="text-xs text-blue-800 font-mono bg-white rounded px-2 py-1 mb-1">
-                {t.auth.email}: {MOCK_CREDENTIALS.email}
+                {t.auth.email}: {DEMO_CREDENTIALS.email}
               </div>
               <div className="text-xs text-blue-800 font-mono bg-white rounded px-2 py-1 mb-2">
-                {t.auth.password}: {MOCK_CREDENTIALS.password}
+                {t.auth.password}: {DEMO_CREDENTIALS.password}
               </div>
               <Button 
                 type="button" 
@@ -185,6 +186,7 @@ export function Login() {
             </div>
           </div>
         </div>
+        )}
 
         {/* Login Card */}
         <Card className="border-0 shadow-xl">
@@ -269,6 +271,8 @@ export function Login() {
                     type="checkbox"
                     id="remember"
                     className="rounded border-gray-300"
+                    checked={remember}
+                    onChange={(e) => setRemember(e.target.checked)}
                     disabled={isLoading}
                   />
                   <Label htmlFor="remember" className="text-sm cursor-pointer">
@@ -304,7 +308,7 @@ export function Login() {
               </div>
 
               <div className="grid grid-cols-2 gap-3">
-                <Button type="button" variant="outline" className="w-full" disabled={isLoading}>
+                <Button type="button" variant="outline" className="w-full" disabled={isLoading} onClick={() => startOAuth('google')} title={t.auth.oauthHint}>
                   <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
                     <path
                       fill="currentColor"
@@ -325,7 +329,7 @@ export function Login() {
                   </svg>
                   {t.auth.google}
                 </Button>
-                <Button type="button" variant="outline" className="w-full" disabled={isLoading}>
+                <Button type="button" variant="outline" className="w-full" disabled={isLoading} onClick={() => startOAuth('github')} title={t.auth.oauthHint}>
                   <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 24 24">
                     <path d="M12 2C6.477 2 2 6.477 2 12c0 4.42 2.865 8.17 6.839 9.49.5.092.682-.217.682-.482 0-.237-.008-.866-.013-1.7-2.782.603-3.369-1.34-3.369-1.34-.454-1.156-1.11-1.463-1.11-1.463-.908-.62.069-.608.069-.608 1.003.07 1.531 1.03 1.531 1.03.892 1.529 2.341 1.087 2.91.831.092-.646.35-1.086.636-1.336-2.22-.253-4.555-1.11-4.555-4.943 0-1.091.39-1.984 1.029-2.683-.103-.253-.446-1.27.098-2.647 0 0 .84-.269 2.75 1.025A9.578 9.578 0 0112 6.836c.85.004 1.705.114 2.504.336 1.909-1.294 2.747-1.025 2.747-1.025.546 1.377.203 2.394.1 2.647.64.699 1.028 1.592 1.028 2.683 0 3.842-2.339 4.687-4.566 4.935.359.309.678.919.678 1.852 0 1.336-.012 2.415-.012 2.743 0 .267.18.578.688.48C19.138 20.167 22 16.418 22 12c0-5.523-4.477-10-10-10z" />
                   </svg>

@@ -55,9 +55,10 @@ app.add_middleware(SessionMiddleware, secret_key="super-session-secret")
 
 app.include_router(health_router, prefix="/health", tags=["Health Check"])
 app.include_router(auth_router, prefix="/api/auth", tags=["Auth"])
-app.include_router(transaction_router, prefix="/api/transactions", tags=["Transactions"])
+# Sub-routers first: otherwise GET /api/transactions/{tx_id} swallows "/recurring"
 app.include_router(recurring_router, prefix="/api/transactions/recurring", tags=["Recurring Transactions"])
 app.include_router(import_router, prefix="/api/transactions/import", tags=["Import"])
+app.include_router(transaction_router, prefix="/api/transactions", tags=["Transactions"])
 app.include_router(dev_router, prefix="/api/dev")
 app.include_router(users_router, prefix="/api/users", tags=["Users"])
 app.include_router(currency_router, prefix="/api/currencies", tags=["Currencies"])

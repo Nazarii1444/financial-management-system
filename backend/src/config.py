@@ -16,9 +16,16 @@ DB_NAME: str = os.getenv("DB_NAME", default="annadb")
 
 DATABASE_URL: str = f"postgresql+asyncpg://{POSTGRES_USER}:{POSTGRES_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
 
+# Frontend base URL — used for OAuth redirects back to the SPA
+FRONTEND_URL: str = os.getenv("FRONTEND_URL", "http://localhost:5173").rstrip("/")
+
 origins = [
     "http://localhost:3000",
     "http://localhost:5173",
+    "http://localhost:5174",
+    "http://127.0.0.1:5173",
+    "http://127.0.0.1:5174",
+    FRONTEND_URL,
 ]
 
 # ===== logging =====

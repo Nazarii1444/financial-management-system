@@ -8,6 +8,7 @@ from src.budgets.schemas import (
     BudgetCreate,
     BudgetMemberCreate,
     BudgetMemberOut,
+    BudgetMemberRoleUpdate,
     BudgetOut,
     BudgetUpdate,
 )
@@ -48,6 +49,17 @@ async def _get_membership_or_403(
     return membership
 
 
+def _member_out(member: BudgetMember, user: User | None) -> dict:
+    return {
+        "id_": member.id_,
+        "budget_id": member.budget_id,
+        "user_id": member.user_id,
+        "role": member.role,
+        "username": user.username if user else None,
+        "email": user.email if user else None,
+    }
+
+
 @budget_router.post("", response_model=BudgetOut, status_code=status.HTTP_201_CREATED)
 async def create_budget(
     payload: BudgetCreate,
@@ -61,6 +73,7 @@ async def create_budget(
         name=payload.name,
         type=payload.type,
         currency=currency,
+        limit_amount=payload.limit_amount,
     )
     session.add(budget)
     await session.flush()
@@ -161,8 +174,13 @@ async def list_budget_members(
     budget = await _get_budget_or_404(session, budget_id)
     await _get_membership_or_403(session, budget.id_, current_user)
 
-    stmt = select(BudgetMember).where(BudgetMember.budget_id == budget.id_).order_by(BudgetMember.id_.asc())
-    return (await session.execute(stmt)).scalars().all()
+    stmt = (
+        select(BudgetMember, User)
+        .join(User, User.id_ == BudgetMember.user_id)
+        .where(BudgetMember.budget_id == budget.id_)
+        .order_by(BudgetMember.id_.asc())
+    )
+    return [_member_out(member, user) for member, user in (await session.execute(stmt)).all()]
 
 
 @budget_router.post("/{budget_id}/members", response_model=BudgetMemberOut, status_code=status.HTTP_201_CREATED)
@@ -181,30 +199,69 @@ async def add_budget_member(
     if budget.type == BudgetType.PERSONAL:
         raise HTTPException(status_code=422, detail="Personal budget cannot have additional members")
 
-    if payload.user_id == budget.owner_user_id:
-        raise HTTPException(status_code=422, detail="Owner is already a member")
-
-    target_user = await session.get(User, payload.user_id)
+    if payload.user_id is not None:
+        target_user = await session.get(User, payload.user_id)
+    else:
+        target_user = (
+            await session.execute(select(User).where(User.email == payload.email.strip().lower()))
+        ).scalar_one_or_none()
     if not target_user:
         raise HTTPException(status_code=404, detail="User not found")
 
+    if target_user.id_ == budget.owner_user_id:
+        raise HTTPException(status_code=422, detail="Owner is already a member")
+
     existing_stmt = select(BudgetMember).where(
         BudgetMember.budget_id == budget.id_,
-        BudgetMember.user_id == payload.user_id,
+        BudgetMember.user_id == target_user.id_,
     )
     existing = (await session.execute(existing_stmt)).scalar_one_or_none()
     if existing:
         raise HTTPException(status_code=409, detail="Member already exists")
 
+    if payload.role == BudgetRole.OWNER:
+        raise HTTPException(status_code=422, detail="Budget can have only one owner")
+
     new_member = BudgetMember(
         budget_id=budget.id_,
-        user_id=payload.user_id,
+        user_id=target_user.id_,
         role=payload.role,
     )
     session.add(new_member)
     await session.commit()
     await session.refresh(new_member)
-    return new_member
+    return _member_out(new_member, target_user)
+
+
+@budget_router.patch("/{budget_id}/members/{user_id}", response_model=BudgetMemberOut)
+async def update_budget_member_role(
+    budget_id: int,
+    user_id: int,
+    payload: BudgetMemberRoleUpdate,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    budget = await _get_budget_or_404(session, budget_id)
+    membership = await _get_membership_or_403(session, budget.id_, current_user)
+
+    if membership.role != BudgetRole.OWNER:
+        raise HTTPException(status_code=403, detail="Only owner can manage members")
+
+    if user_id == budget.owner_user_id or payload.role == BudgetRole.OWNER:
+        raise HTTPException(status_code=422, detail="Owner role cannot be changed")
+
+    stmt = select(BudgetMember).where(
+        BudgetMember.budget_id == budget.id_,
+        BudgetMember.user_id == user_id,
+    )
+    member = (await session.execute(stmt)).scalar_one_or_none()
+    if not member:
+        raise HTTPException(status_code=404, detail="Member not found")
+
+    member.role = payload.role
+    await session.commit()
+    await session.refresh(member)
+    return _member_out(member, await session.get(User, user_id))
 
 
 @budget_router.delete("/{budget_id}/members/{user_id}", status_code=status.HTTP_204_NO_CONTENT)

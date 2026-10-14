@@ -16,6 +16,7 @@ from src.database import get_db
 from src.dependencies import get_current_user
 from src.models import TransactionKind, User
 from src.transactions.currency_converter import get_rates_map
+from src.transactions.schemas import parse_kind_query
 
 from .schemas import (
     BudgetComparisonOut,
@@ -132,14 +133,14 @@ async def get_period_comparison(
     summary="Spending breakdown by category (pie / bar chart data)",
 )
 async def get_category_breakdown(
-    kind: Optional[TransactionKind] = Query(None, description="EXPENSE | INCOME — omit for all"),
+    kind: Optional[str] = Query(None, description="EXPENSE | INCOME (or 0 / 1) — omit for all"),
     date_from: Optional[datetime] = Query(None),
     date_to: Optional[datetime] = Query(None),
     ctx=Depends(_ctx),
 ):
     session, user, rates, currency = ctx
     result = await CategoryBreakdownService(session, user, rates, currency).compute(
-        kind=kind, date_from=date_from, date_to=date_to
+        kind=parse_kind_query(kind), date_from=date_from, date_to=date_to
     )
     return result
 
@@ -152,14 +153,14 @@ async def get_category_breakdown(
     summary="Spending breakdown by tag",
 )
 async def get_tag_breakdown(
-    kind: Optional[TransactionKind] = Query(None, description="EXPENSE | INCOME — omit for all"),
+    kind: Optional[str] = Query(None, description="EXPENSE | INCOME (or 0 / 1) — omit for all"),
     date_from: Optional[datetime] = Query(None),
     date_to: Optional[datetime] = Query(None),
     ctx=Depends(_ctx),
 ):
     session, user, rates, currency = ctx
     result = await TagBreakdownService(session, user, rates, currency).compute(
-        kind=kind, date_from=date_from, date_to=date_to
+        kind=parse_kind_query(kind), date_from=date_from, date_to=date_to
     )
     return result
 

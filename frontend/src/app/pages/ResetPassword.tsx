@@ -8,6 +8,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { toast } from 'sonner';
 import { useLanguage } from '../i18n/LanguageContext';
 import { LanguageSelector } from '../components/auth/LanguageSelector';
+import { authApi, ApiError } from '../lib/api';
+import { errorMessage } from '../lib/errors';
 
 export function ResetPassword() {
   const [showPassword, setShowPassword] = useState(false);
@@ -20,11 +22,12 @@ export function ResetPassword() {
   const location = useLocation();
   const { t } = useLanguage();
 
-  const email = location.state?.email || 'your email';
+  const email: string = location.state?.email || '';
+  const code: string = location.state?.code || '';
 
   const validatePassword = (password: string): boolean => {
-    // At least 8 characters, 1 uppercase, 1 lowercase, 1 number
-    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
+    // Mirrors backend check_password_strength: 8+ chars, upper, lower, digit, special
+    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&]).{8,}$/;
     return passwordRegex.test(password);
   };
 
@@ -47,7 +50,7 @@ export function ResetPassword() {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
     if (!validateForm()) {
@@ -56,13 +59,17 @@ export function ResetPassword() {
     }
 
     setIsLoading(true);
-
-    // Simulate API call
-    setTimeout(() => {
+    try {
+      await authApi.confirmPasswordReset(email, code, password);
       toast.success(t.auth.passwordResetSuccess);
       navigate('/login');
+    } catch (err) {
+      const message = err instanceof ApiError && (err.status === 404 || err.status === 405) ? t.auth.resetNotAvailable : errorMessage(err, t);
+      setErrors({ password: message });
+      toast.error(message);
+    } finally {
       setIsLoading(false);
-    }, 1500);
+    }
   };
 
   // Password strength indicator
@@ -105,7 +112,7 @@ export function ResetPassword() {
         {/* Reset Password Card */}
         <Card className="border-0 shadow-xl">
           <CardHeader>
-            <CardTitle className="text-center">{t.auth.resetPassword}</CardTitle>
+            <CardTitle className="text-center">{t.auth.setNewPassword}</CardTitle>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">

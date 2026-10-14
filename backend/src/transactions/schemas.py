@@ -93,3 +93,27 @@ class RecurringTransactionOut(BaseModel):
         from_attributes = True
         orm_mode = True
 
+
+
+# ── Query helpers ───────────────────────────────────────────────────────────
+
+_KIND_ALIASES = {
+    "0": TransactionKind.EXPENSE, "EXPENSE": TransactionKind.EXPENSE,
+    "1": TransactionKind.INCOME, "INCOME": TransactionKind.INCOME,
+    "2": TransactionKind.TRANSFER, "TRANSFER": TransactionKind.TRANSFER,
+}
+
+
+def parse_kind_query(raw: Optional[str]) -> Optional[TransactionKind]:
+    """Parse ?kind= query param. Accepts 0/1/2 or EXPENSE/INCOME/TRANSFER (case-insensitive).
+
+    FastAPI can't coerce a query string into an int-valued Enum, so the routers
+    take a plain string and convert it here.
+    """
+    if raw is None or raw.strip() == "":
+        return None
+    kind = _KIND_ALIASES.get(raw.strip().upper())
+    if kind is None:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=422, detail="Invalid 'kind' value. Use EXPENSE / INCOME / TRANSFER")
+    return kind
