@@ -2,6 +2,29 @@
 
 ---
 
+## Швидкий локальний запуск (без Alembic)
+
+```bash
+cd backend
+python -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+cp src/.env.example src/.env        # вкажіть свої дані PostgreSQL
+python -m scripts.init_db           # створює таблиці з моделей
+python -m scripts.seed              # тестові дані (пароль усіх користувачів: password123)
+uvicorn src.app:app --reload --port 8000
+```
+
+Немає локального PostgreSQL? Можна підняти в Docker:
+
+```bash
+docker run -d --name fms-postgres -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=financialdb -p 5434:5432 postgres:16
+# і в src/.env: DB_PORT=5434
+```
+
+Далі запустіть фронтенд (`frontend/README.md`).
+
+---
+
 ## Installation
 1. Clone the repo:
 ```bash

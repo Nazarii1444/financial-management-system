@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.database import get_db
 from src.dependencies import get_current_user
 from src.models import Transaction, TransactionKind, User
-from src.transactions.schemas import TransactionOut, TransactionCreate, TransactionUpdate
+from src.transactions.schemas import TransactionOut, TransactionCreate, TransactionUpdate, parse_kind_query
 from src.transactions.currency_converter import convert_to_user_currency
 
 # ── Category lists ──────────────────────────────────────────────────────────
@@ -135,8 +135,24 @@ async def update_transaction(
     if "tags" in data and data["tags"] is not None:
         data["tags"] = [t.strip().lower() for t in data["tags"] if t.strip()]
 
+    if "currency" in data and data["currency"]:
+        data["currency"] = data["currency"].strip().upper()
+
+    # Keep user's capital in sync: revert the old effect, apply the new one
+    affects_capital = {"amount", "kind", "currency"} & data.keys()
+    if affects_capital:
+        old_val = await convert_to_user_currency(
+            session, current_user.default_currency, tx.kind, tx.amount, tx.currency or current_user.default_currency
+        )
+
     for field, value in data.items():
         setattr(tx, field, value)
+
+    if affects_capital:
+        new_val = await convert_to_user_currency(
+            session, current_user.default_currency, tx.kind, tx.amount, tx.currency or current_user.default_currency
+        )
+        current_user.capital = round(float(current_user.capital) - float(old_val) + float(new_val), 2)
 
     await session.commit()
     await session.refresh(tx)
@@ -185,7 +201,7 @@ async def delete_transaction(
 async def list_my_transactions(
         limit: int = Query(50, ge=1, le=1000),
         offset: int = Query(0, ge=0),
-        kind: Optional[TransactionKind] = Query(None, description="Filter by kind: EXPENSE / INCOME / TRANSFER"),
+        kind: Optional[str] = Query(None, description="Filter by kind: EXPENSE / INCOME / TRANSFER (or 0 / 1 / 2)"),
         category: Optional[str] = Query(None, description="Filter by category_name (case-insensitive)"),
         tags: Optional[str] = Query(None, description="Comma-separated tags; returns transactions that have ALL listed tags"),
         date_from: Optional[datetime] = Query(None),
@@ -198,8 +214,9 @@ async def list_my_transactions(
         .where(Transaction.user_id == current_user.id_)
     )
 
-    if kind is not None:
-        stmt = stmt.where(Transaction.kind == kind)
+    kind_value = parse_kind_query(kind)
+    if kind_value is not None:
+        stmt = stmt.where(Transaction.kind == kind_value)
 
     if category:
         stmt = stmt.where(Transaction.category_name == category.strip().lower())

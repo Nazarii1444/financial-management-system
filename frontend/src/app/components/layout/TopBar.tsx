@@ -1,7 +1,5 @@
-import { useState } from 'react';
 import { Bell, ChevronDown, User, LogOut } from 'lucide-react';
 import { useNavigate } from 'react-router';
-import { mockBudgets, mockNotifications, mockUser } from '../../data/mockData';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -12,18 +10,27 @@ import {
 import { Badge } from '../ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
 import { useAuth } from '../../context/AuthContext';
+import { useBudgets } from '../../context/BudgetContext';
+import { useAlerts } from '../../hooks/useAlerts';
 import { toast } from 'sonner';
 import { useLanguage } from '../../i18n/LanguageContext';
+import type { BudgetOut } from '../../types/api';
 
 export function TopBar() {
-  const { t } = useLanguage();
-  const [selectedBudget, setSelectedBudget] = useState(mockBudgets[0]);
-  const unreadCount = mockNotifications.filter((n) => !n.read).length;
-  const { logout } = useAuth();
+  const { t, formatMoney, formatDate } = useLanguage();
+  const { user, logout } = useAuth();
+  const { budgets, selectedBudget, selectBudget } = useBudgets();
+  const { alerts, unreadCount, isRead, markAllRead } = useAlerts();
   const navigate = useNavigate();
 
-  const handleLogout = () => {
-    logout();
+  const budgetTypeLabel = (b: BudgetOut) =>
+    b.type === 'PERSONAL' ? t.budgets.personal : b.type === 'FAMILY' ? t.budgets.family : t.budgets.business;
+
+  const budgetLimitLabel = (b: BudgetOut) =>
+    b.limit_amount ? `${t.header.limit} ${formatMoney(b.limit_amount, b.currency)}` : `${b.currency} · ${t.header.noLimit}`;
+
+  const handleLogout = async () => {
+    await logout();
     toast.success(t.header.loggedOutSuccess);
     navigate('/login');
   };
@@ -36,35 +43,34 @@ export function TopBar() {
           <Wallet className="w-5 h-5 text-gray-600" />
           <div className="flex flex-col items-start">
             <span className="text-sm font-medium text-gray-900">
-              {t.mockData[selectedBudget.name as keyof typeof t.mockData]}
+              {selectedBudget ? selectedBudget.name : t.header.noBudgets}
             </span>
             <span className="text-xs text-gray-500">
-              {selectedBudget.currency} {selectedBudget.balance.toLocaleString()}
+              {selectedBudget ? budgetLimitLabel(selectedBudget) : t.header.selectBudget}
             </span>
           </div>
           <ChevronDown className="w-4 h-4 text-gray-400" />
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="start" className="w-64">
-          {mockBudgets.map((budget) => (
+        <DropdownMenuContent align="start" className="w-72 max-h-96 overflow-y-auto">
+          {budgets.map((budget) => (
             <DropdownMenuItem
-              key={budget.id}
-              onClick={() => setSelectedBudget(budget)}
+              key={budget.id_}
+              onClick={() => selectBudget(budget.id_)}
               className="flex items-start gap-3 p-3"
             >
               <div className="flex-1">
-                <div className="font-medium text-sm">{t.mockData[budget.name as keyof typeof t.mockData]}</div>
+                <div className="font-medium text-sm">{budget.name}</div>
                 <div className="text-xs text-gray-500 mt-0.5">
-                  {budget.type === 'personal' ? t.budgets.personal : budget.type === 'family' ? t.budgets.family : t.budgets.business} •{' '}
-                  {budget.currency} {budget.balance.toLocaleString()}
+                  {budgetTypeLabel(budget)} • {budgetLimitLabel(budget)}
                 </div>
               </div>
-              {selectedBudget.id === budget.id && (
+              {selectedBudget?.id_ === budget.id_ && (
                 <div className="w-2 h-2 bg-blue-600 rounded-full mt-1.5" />
               )}
             </DropdownMenuItem>
           ))}
-          <DropdownMenuSeparator />
-          <DropdownMenuItem className="text-blue-600">
+          {budgets.length > 0 && <DropdownMenuSeparator />}
+          <DropdownMenuItem className="text-blue-600" onClick={() => navigate('/budgets?create=1')}>
             + {t.header.createNewBudget}
           </DropdownMenuItem>
         </DropdownMenuContent>
@@ -73,7 +79,7 @@ export function TopBar() {
       {/* Right Side */}
       <div className="flex items-center gap-4">
         {/* Notifications */}
-        <DropdownMenu>
+        <DropdownMenu onOpenChange={(open) => !open && unreadCount > 0 && markAllRead()}>
           <DropdownMenuTrigger className="relative p-2 rounded-lg hover:bg-gray-100 transition-colors">
             <Bell className="w-5 h-5 text-gray-600" />
             {unreadCount > 0 && (
@@ -82,34 +88,39 @@ export function TopBar() {
               </Badge>
             )}
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-80">
+          <DropdownMenuContent align="end" className="w-80 max-h-[28rem] overflow-y-auto">
             <div className="px-3 py-2 border-b">
               <div className="font-medium text-sm">{t.header.notifications}</div>
             </div>
-            {mockNotifications.slice(0, 4).map((notification) => (
-              <DropdownMenuItem key={notification.id} className="flex flex-col items-start gap-1 p-3">
+            {alerts.length === 0 && (
+              <div className="px-3 py-6 text-center text-sm text-gray-500">{t.header.noNotifications}</div>
+            )}
+            {alerts.map((alert) => (
+              <DropdownMenuItem
+                key={alert.id}
+                className="flex flex-col items-start gap-1 p-3"
+                onClick={() => navigate(alert.href)}
+              >
                 <div className="flex items-center gap-2 w-full">
                   <div
                     className={`w-2 h-2 rounded-full ${
-                      notification.type === 'warning'
+                      alert.type === 'warning'
                         ? 'bg-orange-500'
-                        : notification.type === 'success'
+                        : alert.type === 'success'
                         ? 'bg-green-500'
                         : 'bg-blue-500'
                     }`}
                   />
-                  <div className="font-medium text-sm flex-1">{t.mockData[notification.title as keyof typeof t.mockData]}</div>
-                  {!notification.read && (
-                    <div className="w-2 h-2 bg-blue-600 rounded-full" />
-                  )}
+                  <div className="font-medium text-sm flex-1">{alert.title}</div>
+                  {!isRead(alert.id) && <div className="w-2 h-2 bg-blue-600 rounded-full" />}
                 </div>
-                <div className="text-xs text-gray-600 ml-4">{t.mockData[notification.message as keyof typeof t.mockData]}</div>
-                <div className="text-xs text-gray-400 ml-4">{notification.date}</div>
+                <div className="text-xs text-gray-600 ml-4">{alert.message}</div>
+                <div className="text-xs text-gray-400 ml-4">{formatDate(alert.date)}</div>
               </DropdownMenuItem>
             ))}
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="text-blue-600 text-center justify-center">
-              {t.header.viewAllNotifications}
+            <DropdownMenuItem className="text-blue-600 text-center justify-center" onClick={() => navigate('/settings?tab=notifications')}>
+              {t.settings.notifications.title}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -118,23 +129,29 @@ export function TopBar() {
         <DropdownMenu>
           <DropdownMenuTrigger className="flex items-center gap-3 pl-3 pr-2 py-1.5 rounded-lg hover:bg-gray-100 transition-colors">
             <div className="flex flex-col items-end">
-              <span className="text-sm font-medium text-gray-900">{mockUser.name}</span>
-              <span className="text-xs text-gray-500">{mockUser.subscription.toUpperCase()}</span>
+              <span className="text-sm font-medium text-gray-900">{user?.username}</span>
+              <span className="text-xs text-gray-500">{user?.subscription_plan}</span>
             </div>
             <Avatar className="w-9 h-9">
-              <AvatarImage src={mockUser.avatar} alt={mockUser.name} />
+              {user?.avatar_url && <AvatarImage src={user.avatar_url} alt={user.username} />}
               <AvatarFallback>
-                <User className="w-5 h-5" />
+                {user?.username ? user.username.slice(0, 2).toUpperCase() : <User className="w-5 h-5" />}
               </AvatarFallback>
             </Avatar>
             <ChevronDown className="w-4 h-4 text-gray-400" />
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">
-            <DropdownMenuItem onClick={() => navigate('/settings')}>
+            <div className="px-2 py-1.5 text-xs text-gray-500 truncate">{user?.email}</div>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => navigate('/settings?tab=profile')}>
               {t.header.profileSettings}
             </DropdownMenuItem>
-            <DropdownMenuItem>{t.header.subscription}</DropdownMenuItem>
-            <DropdownMenuItem>{t.header.security}</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => navigate('/settings?tab=subscription')}>
+              {t.header.subscription}
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => navigate('/settings?tab=security')}>
+              {t.header.security}
+            </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={handleLogout} className="text-red-600">
               <LogOut className="w-4 h-4 mr-2" />

@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.database import get_db
 from src.dependencies import get_current_user
 from src.models import Currencies, NotificationPreferences, SubscriptionPlan, User
+from src.transactions.currency_converter import get_rates_map
 from src.settings.schemas import (
     CurrencySettingOut,
     CurrencySettingUpdate,
@@ -108,6 +109,13 @@ async def update_currency(
             status_code=422,
             detail=f"Unsupported currency '{cur}'. Allowed: {[c.value for c in Currencies]}",
         )
+    # Capital is stored in the default currency — convert it along with the switch
+    old = current_user.default_currency
+    if cur != old:
+        rates = await get_rates_map(session)
+        if old in rates and cur in rates:
+            current_user.capital = round(float(current_user.capital) / rates[old] * rates[cur], 2)
+
     current_user.default_currency = cur
     await session.commit()
     return {"default_currency": current_user.default_currency}

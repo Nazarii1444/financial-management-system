@@ -1,7 +1,7 @@
 from decimal import Decimal
 from typing import Optional
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, model_validator
 
 from src.models import BudgetRole, BudgetType
 
@@ -33,7 +33,19 @@ class BudgetOut(BaseModel):
 
 
 class BudgetMemberCreate(BaseModel):
-    user_id: int
+    """Identify the new member either by user_id or by email."""
+    user_id: Optional[int] = None
+    email: Optional[EmailStr] = None
+    role: BudgetRole
+
+    @model_validator(mode="after")
+    def _user_or_email(self):
+        if self.user_id is None and self.email is None:
+            raise ValueError("Either user_id or email is required")
+        return self
+
+
+class BudgetMemberRoleUpdate(BaseModel):
     role: BudgetRole
 
 
@@ -44,4 +56,6 @@ class BudgetMemberOut(BaseModel):
     budget_id: int
     user_id: int
     role: BudgetRole
+    username: Optional[str] = None
+    email: Optional[str] = None
 

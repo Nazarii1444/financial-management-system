@@ -8,6 +8,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { toast } from 'sonner';
 import { useLanguage } from '../i18n/LanguageContext';
 import { LanguageSelector } from '../components/auth/LanguageSelector';
+import { authApi, ApiError } from '../lib/api';
+import { errorMessage } from '../lib/errors';
 
 export function ForgotPassword() {
   const [email, setEmail] = useState('');
@@ -21,7 +23,7 @@ export function ForgotPassword() {
     return emailRegex.test(email);
   };
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
     if (!email) {
@@ -36,13 +38,17 @@ export function ForgotPassword() {
 
     setIsLoading(true);
     setError('');
-
-    // Simulate API call
-    setTimeout(() => {
+    try {
+      await authApi.requestPasswordReset(email.trim().toLowerCase());
       toast.success(t.auth.resetCodeSent);
       navigate('/forgot-password/verify', { state: { email } });
+    } catch (err) {
+      const message = err instanceof ApiError && (err.status === 404 || err.status === 405) ? t.auth.resetNotAvailable : errorMessage(err, t);
+      setError(message);
+      toast.error(message);
+    } finally {
       setIsLoading(false);
-    }, 1500);
+    }
   };
 
   return (

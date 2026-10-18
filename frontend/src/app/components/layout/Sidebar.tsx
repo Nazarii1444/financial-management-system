@@ -8,12 +8,33 @@ import {
   Settings,
   TrendingUp,
 } from 'lucide-react';
+import { useState } from 'react';
+import { toast } from 'sonner';
+import { Crown } from 'lucide-react';
 import { useLanguage } from '../../i18n/LanguageContext';
+import { useAuth } from '../../context/AuthContext';
+import { settingsApi } from '../../lib/api';
+import { errorMessage } from '../../lib/errors';
 import { motion } from 'motion/react';
 
 export function Sidebar() {
   const location = useLocation();
   const { t } = useLanguage();
+  const { user, refreshUser } = useAuth();
+  const [upgrading, setUpgrading] = useState(false);
+
+  const handleUpgrade = async () => {
+    setUpgrading(true);
+    try {
+      await settingsApi.upgrade();
+      await refreshUser();
+      toast.success(t.common.upgradedSuccess);
+    } catch (err) {
+      toast.error(errorMessage(err, t));
+    } finally {
+      setUpgrading(false);
+    }
+  };
 
   const navigation = [
     { name: t.nav.dashboard, href: '/', icon: LayoutDashboard },
@@ -68,15 +89,29 @@ export function Sidebar() {
       </nav>
 
       {/* Upgrade Banner */}
-      <div className="p-4 m-3 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl text-white">
-        <div className="text-sm font-medium mb-1">{t.common.upgradeToPro}</div>
-        <div className="text-xs text-blue-100 mb-3">
-          {t.common.upgradeProDesc}
+      {user?.subscription_plan === 'PRO' ? (
+        <div className="p-4 m-3 bg-gradient-to-br from-purple-50 to-blue-50 rounded-xl border border-blue-100">
+          <div className="flex items-center gap-2 text-sm font-medium text-gray-900">
+            <Crown className="w-4 h-4 text-purple-600" />
+            {t.common.youArePro}
+          </div>
+          <div className="text-xs text-gray-500 mt-1">{t.common.youAreProDesc}</div>
         </div>
-        <button className="w-full bg-white text-blue-600 text-sm py-2 rounded-lg hover:bg-blue-50 transition-colors">
-          {t.common.upgradeNow}
-        </button>
-      </div>
+      ) : (
+        <div className="p-4 m-3 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl text-white">
+          <div className="text-sm font-medium mb-1">{t.common.upgradeToPro}</div>
+          <div className="text-xs text-blue-100 mb-3">
+            {t.common.upgradeProDesc}
+          </div>
+          <button
+            onClick={handleUpgrade}
+            disabled={upgrading}
+            className="w-full bg-white text-blue-600 text-sm py-2 rounded-lg hover:bg-blue-50 transition-colors disabled:opacity-60"
+          >
+            {upgrading ? t.common.loading : t.common.upgradeNow}
+          </button>
+        </div>
+      )}
     </div>
   );
 }

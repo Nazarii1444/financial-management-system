@@ -1,3 +1,5 @@
+from urllib.parse import urlencode
+
 from authlib.integrations.starlette_client import OAuth
 from fastapi import APIRouter, Depends, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -6,6 +8,7 @@ from starlette.responses import JSONResponse, RedirectResponse
 from src.auth.auth_services import create_user
 from src.auth.schemas import UserCreate
 from src.config import (
+    FRONTEND_URL,
     GITHUB_CLIENT_ID,
     GITHUB_CLIENT_SECRET,
     JWT_ACCESS_COOKIE_NAME,
@@ -101,22 +104,9 @@ async def github_callback(
     access_token = await create_access_token({"sub": str(user.id_), "username": username})
     refresh_token = await create_refresh_token({"sub": str(user.id_)})
 
-    resp = JSONResponse(
-        status_code=status.HTTP_200_OK,
-        content={
-            "message": "Signed in with GitHub",
-            "access_token": access_token,
-            "refresh_token": refresh_token,
-            "token_type": "bearer",
-            "user_id": user.id_,
-            "login": gh_user.get("login"),
-            "name": gh_user.get("name"),
-            "avatar_url": gh_user.get("avatar_url"),
-        },
-    )
-    resp.set_cookie(JWT_ACCESS_COOKIE_NAME, access_token)
-    resp.set_cookie(JWT_REFRESH_COOKIE_NAME, refresh_token)
-
-    # return RedirectResponse(url=FRONTEND_SUCCESS_URL, status_code=302)
-
-    return resp
+    # Hand the tokens back to the SPA (fragment is never sent to servers / logs)
+    fragment = urlencode({"access_token": access_token, "refresh_token": refresh_token})
+    redirect = RedirectResponse(url=f"{FRONTEND_URL}/oauth/callback#{fragment}", status_code=302)
+    redirect.set_cookie(JWT_ACCESS_COOKIE_NAME, access_token)
+    redirect.set_cookie(JWT_REFRESH_COOKIE_NAME, refresh_token)
+    return redirect

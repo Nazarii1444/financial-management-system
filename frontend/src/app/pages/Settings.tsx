@@ -1,78 +1,72 @@
-import { useState, useRef, useEffect } from 'react';
-import { User, Bell, Lock, CreditCard, Palette, Globe } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router';
+import { User, Bell, Lock, CreditCard, Palette, Globe, Check, X, Monitor, ShieldCheck } from 'lucide-react';
+import { toast } from 'sonner';
+import { motion } from 'motion/react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Switch } from '../components/ui/switch';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '../components/ui/select';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Avatar, AvatarFallback, AvatarImage } from '../components/ui/avatar';
 import { Badge } from '../components/ui/badge';
-import { mockUser } from '../data/mockData';
-import { useLanguage } from '../i18n/LanguageContext';
-import { motion } from 'motion/react';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../components/ui/dialog';
+import { InputOTP, InputOTPGroup, InputOTPSlot } from '../components/ui/input-otp';
+import { useLanguage, DATE_FORMATS, type DateFormat } from '../i18n/LanguageContext';
+import type { Language } from '../i18n/translations';
+import { useAuth } from '../context/AuthContext';
+import { notifyDataChanged, useApi } from '../hooks/useApi';
+import { authApi, settingsApi, twoFaApi, usersApi } from '../lib/api';
+import { errorMessage } from '../lib/errors';
+import { AsyncBlock, ComingSoonBadge } from '../components/common/States';
+import { ConfirmDialog } from '../components/common/ConfirmDialog';
+import { CURRENCIES, type NotificationPreferences, type TwoFASetup } from '../types/api';
+
+type Tab = 'profile' | 'notifications' | 'security' | 'subscription' | 'preferences';
+const TABS: Tab[] = ['profile', 'notifications', 'security', 'subscription', 'preferences'];
 
 export function Settings() {
-  const { t, language, setLanguage } = useLanguage();
-  const [twoFactorEnabled, setTwoFactorEnabled] = useState(mockUser.twoFactorEnabled);
-  const [emailNotifications, setEmailNotifications] = useState(true);
-  const [pushNotifications, setPushNotifications] = useState(true);
-  const [budgetAlerts, setBudgetAlerts] = useState(true);
-  const [activeTab, setActiveTab] = useState('profile');
+  const { t } = useLanguage();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tabParam = searchParams.get('tab') as Tab | null;
+  const activeTab: Tab = tabParam && TABS.includes(tabParam) ? tabParam : 'profile';
 
   const tabs = [
-    { id: 'profile', label: t.settings.tabs.profile, icon: User },
-    { id: 'notifications', label: t.settings.tabs.notifications, icon: Bell },
-    { id: 'security', label: t.settings.tabs.security, icon: Lock },
-    { id: 'subscription', label: t.settings.tabs.subscription, icon: CreditCard },
-    { id: 'preferences', label: t.settings.tabs.preferences, icon: Palette },
+    { id: 'profile' as const, label: t.settings.tabs.profile, icon: User },
+    { id: 'notifications' as const, label: t.settings.tabs.notifications, icon: Bell },
+    { id: 'security' as const, label: t.settings.tabs.security, icon: Lock },
+    { id: 'subscription' as const, label: t.settings.tabs.subscription, icon: CreditCard },
+    { id: 'preferences' as const, label: t.settings.tabs.preferences, icon: Palette },
   ];
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div>
         <h1 className="text-2xl font-semibold text-gray-900">{t.settings.title}</h1>
-        <p className="text-sm text-gray-500 mt-1">
-          {t.settings.subtitle}
-        </p>
+        <p className="text-sm text-gray-500 mt-1">{t.settings.subtitle}</p>
       </div>
 
-      {/* Liquid Glass Tab Selector */}
+      {/* Tab Selector */}
       <div className="relative">
         <div className="relative flex gap-2 p-2 bg-gradient-to-br from-white/90 via-gray-50/80 to-gray-100/90 rounded-2xl border border-white/20 shadow-lg" style={{ backdropFilter: 'blur(20px)' }}>
           {tabs.map((tab) => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
-            
             return (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
+                onClick={() => setSearchParams({ tab: tab.id }, { replace: true })}
                 className="relative flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-medium flex-1 min-w-fit transition-all duration-200 z-10"
               >
                 {isActive && (
                   <motion.div
                     layoutId="activeTabBg"
                     className="absolute inset-0 rounded-xl bg-gradient-to-br from-blue-500 via-blue-600 to-purple-600 shadow-xl"
-                    style={{
-                      boxShadow: '0 8px 32px rgba(59, 130, 246, 0.4)',
-                    }}
-                    transition={{
-                      type: 'spring',
-                      stiffness: 400,
-                      damping: 30,
-                    }}
+                    style={{ boxShadow: '0 8px 32px rgba(59, 130, 246, 0.4)' }}
+                    transition={{ type: 'spring', stiffness: 400, damping: 30 }}
                   />
                 )}
-                
                 <Icon className={`w-4 h-4 relative z-10 transition-all duration-200 ${isActive ? 'text-white scale-110' : 'text-gray-600'}`} />
                 <span className={`relative z-10 hidden sm:inline transition-all duration-200 ${isActive ? 'text-white font-semibold' : 'text-gray-600'}`}>
                   {tab.label}
@@ -84,230 +78,504 @@ export function Settings() {
       </div>
 
       <div className="space-y-6">
-        {/* Profile Tab */}
-        {activeTab === 'profile' && (
-          <Card className="border-0 shadow-sm">
-            <CardHeader>
-              <CardTitle>{t.settings.profile.title}</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="flex items-center gap-6">
-                <Avatar className="w-24 h-24">
-                  <AvatarImage src={mockUser.avatar} alt={mockUser.name} />
-                  <AvatarFallback>
-                    <User className="w-12 h-12" />
-                  </AvatarFallback>
-                </Avatar>
-                <div>
-                  <Button variant="outline" size="sm">
-                    {t.settings.profile.changeAvatar}
-                  </Button>
-                  <p className="text-sm text-gray-500 mt-2">
-                    {t.settings.profile.avatarHint}
-                  </p>
-                </div>
-              </div>
+        {activeTab === 'profile' && <ProfileTab />}
+        {activeTab === 'notifications' && <NotificationsTab />}
+        {activeTab === 'security' && <SecurityTab />}
+        {activeTab === 'subscription' && <SubscriptionTab />}
+        {activeTab === 'preferences' && <PreferencesTab />}
+      </div>
+    </div>
+  );
+}
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="name">{t.settings.profile.fullName}</Label>
-                  <Input id="name" defaultValue={mockUser.name} />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="email">{t.settings.profile.email}</Label>
-                  <Input id="email" type="email" defaultValue={mockUser.email} />
-                </div>
-              </div>
+// ── Profile ──────────────────────────────────────────────────────────────────
 
-              <div className="space-y-2">
-                <Label htmlFor="phone">{t.settings.profile.phone}</Label>
-                <Input id="phone" type="tel" placeholder={t.settings.profile.phonePlaceholder} />
-              </div>
+function timezones(current: string | null | undefined) {
+  const intl = Intl as typeof Intl & { supportedValuesOf?: (key: string) => string[] };
+  const list = intl.supportedValuesOf?.('timeZone') ?? ['UTC', 'Europe/Kyiv', 'Europe/Warsaw', 'Europe/Berlin', 'Europe/London', 'America/New_York'];
+  return current && !list.includes(current) ? [current, ...list] : list;
+}
 
-              <div className="flex gap-3">
-                <Button>{t.settings.profile.saveChanges}</Button>
-                <Button variant="outline">{t.settings.profile.cancel}</Button>
-              </div>
-            </CardContent>
-          </Card>
-        )}
+function ProfileTab() {
+  const { t } = useLanguage();
+  const { user, setUser, logout } = useAuth();
+  const navigate = useNavigate();
+  const [username, setUsername] = useState(user?.username ?? '');
+  const [email, setEmail] = useState(user?.email ?? '');
+  const [timezone, setTimezone] = useState(user?.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone);
+  const [avatarUrl, setAvatarUrl] = useState(user?.avatar_url ?? '');
+  const [avatarOpen, setAvatarOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteText, setDeleteText] = useState('');
+  const zones = useMemo(() => timezones(user?.timezone), [user?.timezone]);
 
-        {/* Notifications Tab */}
-        {activeTab === 'notifications' && (
-          <Card className="border-0 shadow-sm">
-            <CardHeader>
-              <CardTitle>{t.settings.notifications.title}</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="flex items-center justify-between py-3 border-b border-gray-100">
-                <div>
-                  <h4 className="font-medium text-gray-900">{t.settings.notifications.email}</h4>
-                  <p className="text-sm text-gray-500 mt-1">
-                    {t.settings.notifications.emailDesc}
-                  </p>
-                </div>
-                <Switch
-                  checked={emailNotifications}
-                  onCheckedChange={setEmailNotifications}
-                />
-              </div>
+  const reset = () => {
+    setUsername(user?.username ?? '');
+    setEmail(user?.email ?? '');
+    setTimezone(user?.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone);
+    setAvatarUrl(user?.avatar_url ?? '');
+  };
 
-              <div className="flex items-center justify-between py-3 border-b border-gray-100">
-                <div>
-                  <h4 className="font-medium text-gray-900">{t.settings.notifications.push}</h4>
-                  <p className="text-sm text-gray-500 mt-1">
-                    {t.settings.notifications.pushDesc}
-                  </p>
-                </div>
-                <Switch
-                  checked={pushNotifications}
-                  onCheckedChange={setPushNotifications}
-                />
-              </div>
+  const handleSave = async () => {
+    if (!user) return;
+    setSaving(true);
+    try {
+      let updated = await settingsApi.updateProfile({
+        username: username.trim(),
+        timezone,
+        avatar_url: avatarUrl.trim() || null,
+      });
+      const newEmail = email.trim().toLowerCase();
+      if (newEmail !== user.email) {
+        updated = await settingsApi.changeEmail(newEmail);
+        toast.success(t.settings.profile.emailChanged);
+      }
+      // /settings/* returns a profile without capital/role — merge into the user
+      setUser({ ...user, ...updated });
+      toast.success(t.settings.profile.saved);
+    } catch (err) {
+      toast.error(errorMessage(err, t));
+    } finally {
+      setSaving(false);
+    }
+  };
 
-              <div className="flex items-center justify-between py-3 border-b border-gray-100">
-                <div>
-                  <h4 className="font-medium text-gray-900">{t.settings.notifications.budgetAlerts}</h4>
-                  <p className="text-sm text-gray-500 mt-1">
-                    {t.settings.notifications.budgetAlertsDesc}
-                  </p>
-                </div>
-                <Switch checked={budgetAlerts} onCheckedChange={setBudgetAlerts} />
-              </div>
+  const handleDeleteAccount = async () => {
+    try {
+      await usersApi.deleteMe();
+      await logout();
+      toast.success(t.settings.profile.accountDeleted);
+      navigate('/login');
+    } catch (err) {
+      toast.error(errorMessage(err, t));
+    }
+  };
 
-              <div className="flex items-center justify-between py-3 border-b border-gray-100">
-                <div>
-                  <h4 className="font-medium text-gray-900">{t.settings.notifications.transactionUpdates}</h4>
-                  <p className="text-sm text-gray-500 mt-1">
-                    {t.settings.notifications.transactionUpdatesDesc}
-                  </p>
-                </div>
-                <Switch defaultChecked />
-              </div>
-
-              <div className="flex items-center justify-between py-3 border-b border-gray-100">
-                <div>
-                  <h4 className="font-medium text-gray-900">{t.settings.notifications.monthlyReports}</h4>
-                  <p className="text-sm text-gray-500 mt-1">
-                    {t.settings.notifications.monthlyReportsDesc}
-                  </p>
-                </div>
-                <Switch defaultChecked />
-              </div>
-
-              <div className="flex items-center justify-between py-3">
-                <div>
-                  <h4 className="font-medium text-gray-900">{t.settings.notifications.marketing}</h4>
-                  <p className="text-sm text-gray-500 mt-1">
-                    {t.settings.notifications.marketingDesc}
-                  </p>
-                </div>
-                <Switch />
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Security Tab */}
-        {activeTab === 'security' && (
-          <div className="space-y-6">
-            <Card className="border-0 shadow-sm">
-              <CardHeader>
-                <CardTitle>{t.settings.security.password}</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="current-password">{t.settings.security.currentPassword}</Label>
-                  <Input id="current-password" type="password" />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="new-password">{t.settings.security.newPassword}</Label>
-                  <Input id="new-password" type="password" />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="confirm-password">{t.settings.security.confirmPassword}</Label>
-                  <Input id="confirm-password" type="password" />
-                </div>
-                <Button>{t.settings.security.updatePassword}</Button>
-              </CardContent>
-            </Card>
-
-            <Card className="border-0 shadow-sm">
-              <CardHeader>
-                <CardTitle>{t.settings.security.twoFactor}</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h4 className="font-medium text-gray-900">{t.settings.security.twoFactorStatus}</h4>
-                    <p className="text-sm text-gray-500 mt-1">
-                      {twoFactorEnabled
-                        ? t.settings.security.twoFactorEnabled
-                        : t.settings.security.twoFactorDisabled}
-                    </p>
-                  </div>
-                  <Badge variant={twoFactorEnabled ? 'default' : 'secondary'}>
-                    {twoFactorEnabled ? t.settings.security.enabled : t.settings.security.disabled}
-                  </Badge>
-                </div>
-                <Button
-                  variant={twoFactorEnabled ? 'destructive' : 'default'}
-                  onClick={() => setTwoFactorEnabled(!twoFactorEnabled)}
-                >
-                  {twoFactorEnabled ? t.settings.security.disable2FA : t.settings.security.enable2FA}
-                </Button>
-              </CardContent>
-            </Card>
-
-            <Card className="border-0 shadow-sm">
-              <CardHeader>
-                <CardTitle>{t.settings.security.activeSessions}</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="flex items-center justify-between p-3 rounded-lg bg-gray-50">
-                  <div>
-                    <h4 className="font-medium text-gray-900">{t.settings.security.currentSession}</h4>
-                    <p className="text-sm text-gray-500 mt-1">
-                      Chrome on macOS • San Francisco, CA
-                    </p>
-                  </div>
-                  <Badge>{t.settings.security.active}</Badge>
-                </div>
-                <div className="flex items-center justify-between p-3 rounded-lg border border-gray-100">
-                  <div>
-                    <h4 className="font-medium text-gray-900">iPhone 14 Pro</h4>
-                    <p className="text-sm text-gray-500 mt-1">
-                      Safari on iOS • Last active 2 hours ago
-                    </p>
-                  </div>
-                  <Button variant="ghost" size="sm">
-                    {t.settings.security.revoke}
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+  return (
+    <>
+      <Card className="border-0 shadow-sm">
+        <CardHeader>
+          <CardTitle>{t.settings.profile.title}</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="flex items-center gap-6">
+            <Avatar className="w-24 h-24">
+              {avatarUrl && <AvatarImage src={avatarUrl} alt={username} />}
+              <AvatarFallback className="text-2xl">{username ? username.slice(0, 2).toUpperCase() : <User className="w-12 h-12" />}</AvatarFallback>
+            </Avatar>
+            <div>
+              <Button variant="outline" size="sm" onClick={() => setAvatarOpen(true)}>
+                {t.settings.profile.changeAvatar}
+              </Button>
+              <p className="text-sm text-gray-500 mt-2">{t.settings.profile.avatarHint}</p>
+            </div>
           </div>
-        )}
 
-        {/* Subscription Tab */}
-        {activeTab === 'subscription' && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="username">{t.settings.profile.username}</Label>
+              <Input id="username" value={username} minLength={3} maxLength={64} onChange={(e) => setUsername(e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="email">{t.settings.profile.email}</Label>
+              <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>{t.settings.profile.timezone}</Label>
+              <Select value={timezone} onValueChange={setTimezone}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="max-h-72">
+                  {zones.map((z) => (
+                    <SelectItem key={z} value={z}>
+                      {z}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="phone" className="flex items-center gap-2">
+                {t.settings.profile.phone} <ComingSoonBadge />
+              </Label>
+              <Input id="phone" type="tel" placeholder={t.settings.profile.phonePlaceholder} disabled title={t.common.comingSoonHint} />
+            </div>
+          </div>
+
+          <div className="flex gap-3">
+            <Button onClick={handleSave} disabled={saving || username.trim().length < 3}>
+              {saving ? t.common.saving : t.settings.profile.saveChanges}
+            </Button>
+            <Button variant="outline" onClick={reset} disabled={saving}>
+              {t.settings.profile.cancel}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="border border-red-100 shadow-sm">
+        <CardHeader>
+          <CardTitle className="text-red-600">{t.settings.profile.dangerZone}</CardTitle>
+        </CardHeader>
+        <CardContent className="flex items-center justify-between gap-4 flex-wrap">
+          <p className="text-sm text-gray-600">{t.settings.profile.deleteAccountDesc}</p>
+          <Button
+            variant="outline"
+            className="text-red-600 border-red-200 hover:text-red-700"
+            onClick={() => {
+              setDeleteText('');
+              setDeleteOpen(true);
+            }}
+          >
+            {t.settings.profile.deleteAccount}
+          </Button>
+        </CardContent>
+      </Card>
+
+      <Dialog open={avatarOpen} onOpenChange={setAvatarOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{t.settings.profile.changeAvatar}</DialogTitle>
+            <DialogDescription>{t.settings.profile.avatarHint}</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="avatar-url">{t.settings.profile.avatarUrl}</Label>
+              <Input id="avatar-url" type="url" maxLength={512} placeholder="https://..." value={avatarUrl} onChange={(e) => setAvatarUrl(e.target.value)} />
+            </div>
+            <div className="flex gap-3">
+              <Button variant="outline" className="flex-1" onClick={() => setAvatarUrl('')}>
+                {t.settings.profile.removeAvatar}
+              </Button>
+              <Button className="flex-1" onClick={() => setAvatarOpen(false)}>
+                {t.common.confirm}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <ConfirmDialog
+        open={deleteOpen}
+        onOpenChange={setDeleteOpen}
+        title={t.settings.profile.deleteAccount}
+        description={
+          <span className="block space-y-3">
+            <span className="block">{t.settings.profile.deleteAccountDesc}</span>
+            <span className="block text-gray-900">{t.settings.profile.deleteAccountConfirm}</span>
+            <Input value={deleteText} onChange={(e) => setDeleteText(e.target.value)} placeholder="DELETE" />
+          </span>
+        }
+        confirmLabel={t.settings.profile.deleteAccount}
+        confirmDisabled={deleteText !== 'DELETE'}
+        onConfirm={handleDeleteAccount}
+      />
+    </>
+  );
+}
+
+// ── Notifications ────────────────────────────────────────────────────────────
+
+function NotificationsTab() {
+  const { t } = useLanguage();
+  const prefs = useApi(() => settingsApi.notifications(), []);
+
+  const rows: { key: keyof NotificationPreferences; title: string; desc: string }[] = [
+    { key: 'email_enabled', title: t.settings.notifications.email, desc: t.settings.notifications.emailDesc },
+    { key: 'push_enabled', title: t.settings.notifications.push, desc: t.settings.notifications.pushDesc },
+    { key: 'budget_limit_alerts', title: t.settings.notifications.budgetAlerts, desc: t.settings.notifications.budgetAlertsDesc },
+    { key: 'recurring_reminders', title: t.settings.notifications.recurringReminders, desc: t.settings.notifications.recurringRemindersDesc },
+    { key: 'goal_milestone_alerts', title: t.settings.notifications.goalMilestones, desc: t.settings.notifications.goalMilestonesDesc },
+    { key: 'monthly_summary', title: t.settings.notifications.monthlyReports, desc: t.settings.notifications.monthlyReportsDesc },
+  ];
+
+  const toggle = async (key: keyof NotificationPreferences, value: boolean) => {
+    if (!prefs.data) return;
+    const previous = prefs.data;
+    prefs.setData({ ...previous, [key]: value }); // optimistic
+    try {
+      prefs.setData(await settingsApi.updateNotifications({ [key]: value }));
+      toast.success(t.settings.notifications.saved);
+      notifyDataChanged(); // alerts in the top bar depend on these
+    } catch (err) {
+      prefs.setData(previous);
+      toast.error(errorMessage(err, t));
+    }
+  };
+
+  return (
+    <Card className="border-0 shadow-sm">
+      <CardHeader>
+        <CardTitle>{t.settings.notifications.title}</CardTitle>
+        <p className="text-xs text-gray-500">{t.settings.notifications.deliveryHint}</p>
+      </CardHeader>
+      <CardContent>
+        <AsyncBlock state={prefs}>
+          {(data) => (
+            <div className="space-y-2">
+              {rows.map((row, i) => (
+                <div key={row.key} className={`flex items-center justify-between py-3 ${i < rows.length - 1 ? 'border-b border-gray-100' : ''}`}>
+                  <div>
+                    <h4 className="font-medium text-gray-900">{row.title}</h4>
+                    <p className="text-sm text-gray-500 mt-1">{row.desc}</p>
+                  </div>
+                  <Switch checked={data[row.key]} onCheckedChange={(v) => toggle(row.key, v)} />
+                </div>
+              ))}
+            </div>
+          )}
+        </AsyncBlock>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ── Security ─────────────────────────────────────────────────────────────────
+
+function SecurityTab() {
+  const { t } = useLanguage();
+  const { user, refreshUser } = useAuth();
+  const [current, setCurrent] = useState('');
+  const [next, setNext] = useState('');
+  const [confirm, setConfirm] = useState('');
+  const [savingPassword, setSavingPassword] = useState(false);
+
+  const [setup, setSetup] = useState<TwoFASetup | null>(null);
+  const [disableOpen, setDisableOpen] = useState(false);
+  const [code, setCode] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [attempt, setAttempt] = useState(0);
+
+  const handlePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!current || !next || !confirm) {
+      toast.error(t.settings.security.fillAllFields);
+      return;
+    }
+    if (next !== confirm) {
+      toast.error(t.settings.security.passwordsDoNotMatch);
+      return;
+    }
+    setSavingPassword(true);
+    try {
+      await authApi.changePassword(current, next);
+      toast.success(t.settings.security.passwordUpdated);
+      setCurrent('');
+      setNext('');
+      setConfirm('');
+    } catch (err) {
+      toast.error(errorMessage(err, t));
+    } finally {
+      setSavingPassword(false);
+    }
+  };
+
+  const startSetup = async () => {
+    setBusy(true);
+    try {
+      setCode('');
+      setSetup(await twoFaApi.setup());
+    } catch (err) {
+      toast.error(errorMessage(err, t));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const confirm2fa = async (mode: 'enable' | 'disable', value = code) => {
+    if (value.length !== 6) return;
+    setBusy(true);
+    try {
+      if (mode === 'enable') await twoFaApi.verify(value);
+      else await twoFaApi.disable(value);
+      toast.success(mode === 'enable' ? t.settings.security.enabledSuccess : t.settings.security.disabledSuccess);
+      setSetup(null);
+      setDisableOpen(false);
+      await refreshUser();
+    } catch (err) {
+      toast.error(errorMessage(err, t));
+      setCode('');
+      setAttempt((n) => n + 1);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const enabled = Boolean(user?.twofa_enabled);
+  const otp = (mode: 'enable' | 'disable') => (
+    <div className="flex flex-col items-center gap-3">
+      <InputOTP key={attempt} maxLength={6} value={code} onChange={setCode} onComplete={(v: string) => void confirm2fa(mode, v)} disabled={busy} autoFocus>
+        <InputOTPGroup>
+          {[0, 1, 2, 3, 4, 5].map((i) => (
+            <InputOTPSlot key={i} index={i} />
+          ))}
+        </InputOTPGroup>
+      </InputOTP>
+      <Button className="w-full" variant={mode === 'disable' ? 'destructive' : 'default'} disabled={busy || code.length !== 6} onClick={() => confirm2fa(mode)}>
+        {mode === 'enable' ? t.settings.security.confirmEnable : t.settings.security.confirmDisable}
+      </Button>
+    </div>
+  );
+
+  return (
+    <div className="space-y-6">
+      <Card className="border-0 shadow-sm">
+        <CardHeader>
+          <CardTitle>{t.settings.security.password}</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <form className="space-y-4" onSubmit={handlePassword}>
+            <div className="space-y-2">
+              <Label htmlFor="current-password">{t.settings.security.currentPassword}</Label>
+              <Input id="current-password" type="password" autoComplete="current-password" value={current} onChange={(e) => setCurrent(e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="new-password">{t.settings.security.newPassword}</Label>
+              <Input id="new-password" type="password" autoComplete="new-password" value={next} onChange={(e) => setNext(e.target.value)} />
+              <p className="text-xs text-gray-500">{t.auth.passwordRequirements}</p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="confirm-password">{t.settings.security.confirmPassword}</Label>
+              <Input id="confirm-password" type="password" autoComplete="new-password" value={confirm} onChange={(e) => setConfirm(e.target.value)} />
+            </div>
+            <Button type="submit" disabled={savingPassword}>
+              {savingPassword ? t.common.saving : t.settings.security.updatePassword}
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
+
+      <Card className="border-0 shadow-sm">
+        <CardHeader>
+          <CardTitle>{t.settings.security.twoFactor}</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h4 className="font-medium text-gray-900">{t.settings.security.twoFactorStatus}</h4>
+              <p className="text-sm text-gray-500 mt-1">{enabled ? t.settings.security.twoFactorEnabled : t.settings.security.twoFactorDisabled}</p>
+            </div>
+            <Badge variant={enabled ? 'default' : 'secondary'}>{enabled ? t.settings.security.enabled : t.settings.security.disabled}</Badge>
+          </div>
+          <Button
+            variant={enabled ? 'destructive' : 'default'}
+            disabled={busy}
+            onClick={() => {
+              if (enabled) {
+                setCode('');
+                setDisableOpen(true);
+              } else void startSetup();
+            }}
+          >
+            <ShieldCheck className="w-4 h-4 mr-2" />
+            {enabled ? t.settings.security.disable2FA : t.settings.security.enable2FA}
+          </Button>
+        </CardContent>
+      </Card>
+
+      <Card className="border-0 shadow-sm">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            {t.settings.security.activeSessions} <ComingSoonBadge />
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="flex items-center justify-between p-3 rounded-lg bg-gray-50">
+            <div className="flex items-center gap-3">
+              <Monitor className="w-5 h-5 text-gray-500" />
+              <div>
+                <h4 className="font-medium text-gray-900">{t.settings.security.currentSession}</h4>
+                <p className="text-sm text-gray-500 mt-1 max-w-md truncate">{navigator.userAgent}</p>
+              </div>
+            </div>
+            <Badge>{t.settings.security.active}</Badge>
+          </div>
+          <p className="text-xs text-gray-500">{t.settings.security.otherSessionsHint}</p>
+        </CardContent>
+      </Card>
+
+      {/* Enable 2FA: scan QR, confirm with a code */}
+      <Dialog open={Boolean(setup)} onOpenChange={(open) => !open && setSetup(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{t.settings.security.enable2FA}</DialogTitle>
+            <DialogDescription>{t.settings.security.scanQr}</DialogDescription>
+          </DialogHeader>
+          {setup && (
+            <div className="space-y-4">
+              <img src={`data:image/png;base64,${setup.qr_code_base64}`} alt="2FA QR" className="w-48 h-48 mx-auto" />
+              <div className="text-center">
+                <p className="text-xs text-gray-500">{t.settings.security.secretKey}</p>
+                <code className="text-sm font-mono bg-gray-100 rounded px-2 py-1 select-all">{setup.secret}</code>
+              </div>
+              <p className="text-sm text-center text-gray-700">{t.settings.security.enterCode}</p>
+              {otp('enable')}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={disableOpen} onOpenChange={setDisableOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{t.settings.security.disable2FA}</DialogTitle>
+            <DialogDescription>{t.settings.security.enterCode}</DialogDescription>
+          </DialogHeader>
+          {otp('disable')}
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+// ── Subscription ─────────────────────────────────────────────────────────────
+
+function SubscriptionTab() {
+  const { t } = useLanguage();
+  const { refreshUser } = useAuth();
+  const subscription = useApi(() => settingsApi.subscription(), []);
+  const [busy, setBusy] = useState(false);
+  const [downgradeOpen, setDowngradeOpen] = useState(false);
+
+  const change = async (to: 'PRO' | 'FREE') => {
+    setBusy(true);
+    try {
+      if (to === 'PRO') await settingsApi.upgrade();
+      else await settingsApi.downgrade();
+      toast.success(to === 'PRO' ? t.settings.subscription.upgraded : t.settings.subscription.downgraded);
+      subscription.reload();
+      await refreshUser();
+    } catch (err) {
+      toast.error(errorMessage(err, t));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <AsyncBlock state={subscription}>
+      {(data) => {
+        const isPro = data.plan === 'PRO';
+        return (
           <div className="space-y-6">
             <Card className="border-0 shadow-sm bg-gradient-to-br from-blue-50 to-purple-50">
               <CardContent className="pt-6">
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between flex-wrap gap-4">
                   <div>
-                    <Badge className="bg-gradient-to-r from-blue-600 to-purple-600 mb-2">
-                      {mockUser.subscription.toUpperCase()}
+                    <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">{t.settings.subscription.currentPlan}</p>
+                    <Badge className={isPro ? 'bg-gradient-to-r from-blue-600 to-purple-600 mb-2' : 'mb-2'} variant={isPro ? 'default' : 'secondary'}>
+                      {data.plan}
                     </Badge>
-                    <h3 className="text-2xl font-semibold text-gray-900">
-                      {t.settings.subscription.plan}
-                    </h3>
-                    <p className="text-sm text-gray-600 mt-1">
-                      {t.settings.subscription.billingInfo}
-                    </p>
+                    <h3 className="text-2xl font-semibold text-gray-900">{isPro ? t.settings.subscription.pro : t.settings.subscription.free}</h3>
+                    <p className="text-sm text-gray-600 mt-1">{isPro ? t.settings.subscription.proDesc : t.settings.subscription.freeDesc}</p>
                   </div>
                   <div className="text-right">
-                    <p className="text-3xl font-semibold text-gray-900">$9.99</p>
+                    <p className="text-3xl font-semibold text-gray-900">{isPro ? t.settings.subscription.price : '$0'}</p>
                     <p className="text-sm text-gray-600 mt-1">{t.settings.subscription.perMonth}</p>
                   </div>
                 </div>
@@ -319,34 +587,15 @@ export function Settings() {
                 <CardTitle>{t.settings.subscription.features}</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-3">
-                  {[
-                    t.settings.subscription.featuresList.unlimitedBudgets,
-                    t.settings.subscription.featuresList.aiInsights,
-                    t.settings.subscription.featuresList.advancedReporting,
-                    t.settings.subscription.featuresList.multiCurrency,
-                    t.settings.subscription.featuresList.prioritySupport,
-                    t.settings.subscription.featuresList.exportData,
-                    t.settings.subscription.featuresList.ocrScanning,
-                    t.settings.subscription.featuresList.collaborative,
-                  ].map((feature) => (
-                    <div key={feature} className="flex items-center gap-3">
-                      <div className="w-5 h-5 bg-green-500 rounded-full flex items-center justify-center flex-shrink-0">
-                        <svg
-                          className="w-3 h-3 text-white"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={3}
-                            d="M5 13l4 4L19 7"
-                          />
-                        </svg>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {data.features.map((feature) => (
+                    <div key={feature.label} className="flex items-center gap-3">
+                      <div className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 ${feature.available ? 'bg-green-500' : 'bg-gray-200'}`}>
+                        {feature.available ? <Check className="w-3 h-3 text-white" /> : <X className="w-3 h-3 text-gray-500" />}
                       </div>
-                      <span className="text-gray-700">{feature}</span>
+                      <span className={feature.available ? 'text-gray-700' : 'text-gray-400'}>
+                        {t.settings.subscription.featureLabels[feature.label] ?? feature.label}
+                      </span>
                     </div>
                   ))}
                 </div>
@@ -356,106 +605,160 @@ export function Settings() {
             <Card className="border-0 shadow-sm">
               <CardHeader>
                 <CardTitle>{t.settings.subscription.manage}</CardTitle>
+                <p className="text-xs text-gray-500">{t.settings.subscription.paymentsHint}</p>
               </CardHeader>
               <CardContent className="space-y-3">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  <Button variant="outline" className="w-full">
-                    {t.settings.subscription.updatePayment}
+                  <Button variant="outline" className="w-full" disabled title={t.common.comingSoonHint}>
+                    {t.settings.subscription.updatePayment} <ComingSoonBadge />
                   </Button>
-                  <Button variant="outline" className="w-full">
-                    {t.settings.subscription.viewBilling}
+                  <Button variant="outline" className="w-full" disabled title={t.common.comingSoonHint}>
+                    {t.settings.subscription.viewBilling} <ComingSoonBadge />
                   </Button>
-                  <Button variant="outline" className="w-full text-red-600 hover:text-red-700 border-red-200 hover:border-red-300">
-                    {t.settings.subscription.cancel}
-                  </Button>
+                  {isPro ? (
+                    <Button
+                      variant="outline"
+                      className="w-full text-red-600 hover:text-red-700 border-red-200 hover:border-red-300"
+                      disabled={busy}
+                      onClick={() => setDowngradeOpen(true)}
+                    >
+                      {t.settings.subscription.downgrade}
+                    </Button>
+                  ) : (
+                    <Button className="w-full" disabled={busy} onClick={() => change('PRO')}>
+                      {t.settings.subscription.upgrade}
+                    </Button>
+                  )}
                 </div>
               </CardContent>
             </Card>
+
+            <ConfirmDialog
+              open={downgradeOpen}
+              onOpenChange={setDowngradeOpen}
+              title={t.settings.subscription.downgrade}
+              description={t.settings.subscription.downgradeConfirm}
+              confirmLabel={t.common.confirm}
+              onConfirm={() => change('FREE')}
+            />
           </div>
-        )}
+        );
+      }}
+    </AsyncBlock>
+  );
+}
 
-        {/* Preferences Tab */}
-        {activeTab === 'preferences' && (
-          <Card className="border-0 shadow-sm">
-            <CardHeader>
-              <CardTitle>{t.settings.preferences.title}</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="space-y-2">
-                <Label htmlFor="currency">{t.settings.preferences.currency}</Label>
-                <Select defaultValue={mockUser.defaultCurrency}>
-                  <SelectTrigger>
-                    <Globe className="w-4 h-4 mr-2" />
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="USD">USD ($) - US Dollar</SelectItem>
-                    <SelectItem value="EUR">EUR (€) - Euro</SelectItem>
-                    <SelectItem value="GBP">GBP (£) - British Pound</SelectItem>
-                    <SelectItem value="JPY">JPY (¥) - Japanese Yen</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+// ── Preferences ──────────────────────────────────────────────────────────────
 
-              <div className="space-y-2">
-                <Label htmlFor="language">{t.settings.preferences.language}</Label>
-                <Select value={language} onValueChange={(value) => setLanguage(value as 'en' | 'uk')}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="en">🇺🇸 English</SelectItem>
-                    <SelectItem value="uk">🇺🇦 Українська</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+function PreferencesTab() {
+  const { t, language, setLanguage, dateFormat, setDateFormat, formatDate } = useLanguage();
+  const { user, refreshUser } = useAuth();
+  const [currency, setCurrency] = useState<string>(user?.default_currency ?? 'USD');
 
-              <div className="space-y-2">
-                <Label htmlFor="theme">{t.settings.preferences.theme}</Label>
-                <Select defaultValue="light">
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="light">{t.settings.preferences.themeOptions.light}</SelectItem>
-                    <SelectItem value="dark">{t.settings.preferences.themeOptions.dark}</SelectItem>
-                    <SelectItem value="auto">{t.settings.preferences.themeOptions.auto}</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+  useEffect(() => {
+    if (user) setCurrency(user.default_currency);
+  }, [user]);
 
-              <div className="space-y-2">
-                <Label htmlFor="dateFormat">{t.settings.preferences.dateFormat}</Label>
-                <Select defaultValue="MM/DD/YYYY">
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="MM/DD/YYYY">MM/DD/YYYY</SelectItem>
-                    <SelectItem value="DD/MM/YYYY">DD/MM/YYYY</SelectItem>
-                    <SelectItem value="YYYY-MM-DD">YYYY-MM-DD</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+  const changeCurrency = async (value: string) => {
+    const previous = currency;
+    setCurrency(value);
+    try {
+      await settingsApi.updateCurrency(value);
+      await refreshUser();
+      notifyDataChanged(); // analytics are reported in the default currency
+      toast.success(t.settings.preferences.currencySaved);
+    } catch (err) {
+      setCurrency(previous);
+      toast.error(errorMessage(err, t));
+    }
+  };
 
-              <div className="flex items-center justify-between py-3 border-t border-gray-100">
-                <div>
-                  <h4 className="font-medium text-gray-900">{t.settings.preferences.soundEffects}</h4>
-                  <p className="text-sm text-gray-500 mt-1">
-                    {t.settings.preferences.soundEffectsDesc}
-                  </p>
-                </div>
-                <Switch defaultChecked />
-              </div>
+  return (
+    <Card className="border-0 shadow-sm">
+      <CardHeader>
+        <CardTitle>{t.settings.preferences.title}</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        <div className="space-y-2">
+          <Label>{t.settings.preferences.currency}</Label>
+          <Select value={currency} onValueChange={changeCurrency}>
+            <SelectTrigger>
+              <Globe className="w-4 h-4 mr-2" />
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {CURRENCIES.map((c) => (
+                <SelectItem key={c} value={c}>
+                  {c}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-gray-500">{t.settings.preferences.currencyHint}</p>
+        </div>
 
-              <div className="flex gap-3 pt-4">
-                <Button>{t.settings.preferences.save}</Button>
-                <Button variant="outline">{t.settings.preferences.reset}</Button>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-      </div>
-    </div>
+        <div className="space-y-2">
+          <Label>{t.settings.preferences.language}</Label>
+          <Select value={language} onValueChange={(value) => setLanguage(value as Language)}>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="uk">🇺🇦 Українська</SelectItem>
+              <SelectItem value="en">🇺🇸 English</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="space-y-2">
+          <Label>{t.settings.preferences.dateFormat}</Label>
+          <Select
+            value={dateFormat}
+            onValueChange={(value) => {
+              setDateFormat(value as DateFormat);
+              toast.success(t.settings.preferences.dateFormatSaved);
+            }}
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {DATE_FORMATS.map((f) => (
+                <SelectItem key={f} value={f}>
+                  {f}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-gray-500">{formatDate(new Date())}</p>
+        </div>
+
+        <div className="space-y-2">
+          <Label className="flex items-center gap-2">
+            {t.settings.preferences.theme} <ComingSoonBadge />
+          </Label>
+          <Select value="light" disabled>
+            <SelectTrigger title={t.common.comingSoonHint}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="light">{t.settings.preferences.themeOptions.light}</SelectItem>
+              <SelectItem value="dark">{t.settings.preferences.themeOptions.dark}</SelectItem>
+              <SelectItem value="auto">{t.settings.preferences.themeOptions.auto}</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="flex items-center justify-between py-3 border-t border-gray-100">
+          <div>
+            <h4 className="font-medium text-gray-900 flex items-center gap-2">
+              {t.settings.preferences.soundEffects} <ComingSoonBadge />
+            </h4>
+            <p className="text-sm text-gray-500 mt-1">{t.settings.preferences.soundEffectsDesc}</p>
+          </div>
+          <Switch disabled />
+        </div>
+      </CardContent>
+    </Card>
   );
 }

@@ -1,4 +1,4 @@
-import { createBrowserRouter } from 'react-router';
+import { createBrowserRouter, Navigate } from 'react-router';
 import { MainLayout } from './components/layout/MainLayout';
 import { Dashboard } from './pages/Dashboard';
 import { Transactions } from './pages/Transactions';
@@ -12,33 +12,19 @@ import { TwoFactorAuth } from './pages/TwoFactorAuth';
 import { ForgotPassword } from './pages/ForgotPassword';
 import { VerifyResetCode } from './pages/VerifyResetCode';
 import { ResetPassword } from './pages/ResetPassword';
-import { ProtectedRoute } from './components/ProtectedRoute';
+import { OAuthCallback } from './pages/OAuthCallback';
+import { GuestRoute, ProtectedRoute } from './components/ProtectedRoute';
+
+const guest = (element: React.ReactNode) => <GuestRoute>{element}</GuestRoute>;
 
 export const router = createBrowserRouter([
-  {
-    path: '/login',
-    Component: Login,
-  },
-  {
-    path: '/register',
-    Component: Register,
-  },
-  {
-    path: '/2fa',
-    Component: TwoFactorAuth,
-  },
-  {
-    path: '/forgot-password',
-    Component: ForgotPassword,
-  },
-  {
-    path: '/forgot-password/verify',
-    Component: VerifyResetCode,
-  },
-  {
-    path: '/forgot-password/reset',
-    Component: ResetPassword,
-  },
+  { path: '/login', element: guest(<Login />) },
+  { path: '/register', element: guest(<Register />) },
+  { path: '/2fa', element: guest(<TwoFactorAuth />) },
+  { path: '/forgot-password', element: guest(<ForgotPassword />) },
+  { path: '/forgot-password/verify', element: guest(<VerifyResetCode />) },
+  { path: '/forgot-password/reset', element: guest(<ResetPassword />) },
+  { path: '/oauth/callback', Component: OAuthCallback },
   {
     path: '/',
     element: (
@@ -47,30 +33,13 @@ export const router = createBrowserRouter([
       </ProtectedRoute>
     ),
     children: [
-      {
-        index: true,
-        Component: Dashboard,
-      },
-      {
-        path: 'transactions',
-        Component: Transactions,
-      },
-      {
-        path: 'budgets',
-        Component: Budgets,
-      },
-      {
-        path: 'goals',
-        Component: Goals,
-      },
-      {
-        path: 'reports',
-        Component: Reports,
-      },
-      {
-        path: 'settings',
-        Component: Settings,
-      },
+      { index: true, Component: Dashboard },
+      { path: 'transactions', Component: Transactions },
+      { path: 'budgets', Component: Budgets },
+      { path: 'goals', Component: Goals },
+      { path: 'reports', Component: Reports },
+      { path: 'settings', Component: Settings },
     ],
   },
+  { path: '*', element: <Navigate to="/" replace /> },
 ]);

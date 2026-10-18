@@ -6,14 +6,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { toast } from 'sonner';
 import { useLanguage } from '../i18n/LanguageContext';
 import { LanguageSelector } from '../components/auth/LanguageSelector';
+import { authApi, ApiError } from '../lib/api';
+import { errorMessage } from '../lib/errors';
 import {
   InputOTP,
   InputOTPGroup,
   InputOTPSlot,
 } from '../components/ui/input-otp';
-
-// Mock reset code for testing
-const MOCK_RESET_CODE = '789012';
 
 export function VerifyResetCode() {
   const [code, setCode] = useState('');
@@ -23,9 +22,9 @@ export function VerifyResetCode() {
   const location = useLocation();
   const { t } = useLanguage();
 
-  const email = location.state?.email || 'your email';
+  const email: string = location.state?.email || '';
 
-  const handleVerify = () => {
+  const handleVerify = async () => {
     if (code.length !== 6) {
       setError(t.auth.enterCompleteCode);
       return;
@@ -33,25 +32,29 @@ export function VerifyResetCode() {
 
     setIsLoading(true);
     setError('');
-
-    // Simulate API call
-    setTimeout(() => {
-      if (code === MOCK_RESET_CODE) {
-        toast.success(t.auth.codeVerifiedSuccess);
-        navigate('/forgot-password/reset', { state: { email, code } });
-      } else {
-        setError(t.auth.invalidVerificationCode);
-        toast.error(t.auth.invalidVerificationCode);
-        setCode('');
-      }
+    try {
+      await authApi.verifyPasswordReset(email, code);
+      toast.success(t.auth.codeVerifiedSuccess);
+      navigate('/forgot-password/reset', { state: { email, code } });
+    } catch (err) {
+      const message = err instanceof ApiError && (err.status === 404 || err.status === 405) ? t.auth.resetNotAvailable : errorMessage(err, t);
+      setError(message);
+      toast.error(message);
+      setCode('');
+    } finally {
       setIsLoading(false);
-    }, 1000);
+    }
   };
 
-  const handleResendCode = () => {
-    toast.success(t.auth.newCodeSent);
+  const handleResendCode = async () => {
     setCode('');
     setError('');
+    try {
+      await authApi.requestPasswordReset(email);
+      toast.success(t.auth.newCodeSent);
+    } catch (err) {
+      toast.error(err instanceof ApiError && (err.status === 404 || err.status === 405) ? t.auth.resetNotAvailable : errorMessage(err, t));
+    }
   };
 
   const handleBack = () => {
@@ -75,34 +78,6 @@ export function VerifyResetCode() {
           <p className="text-gray-600 mt-2">
             {t.auth.verifyResetCodeDescription}
           </p>
-        </div>
-
-        {/* Demo Code Info */}
-        <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-          <div className="flex items-start gap-3">
-            <svg
-              className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-              />
-            </svg>
-            <div className="flex-1">
-              <h4 className="text-sm font-medium text-blue-900 mb-1">{t.auth.demoAccount}</h4>
-              <p className="text-xs text-blue-700 mb-2">
-                {t.auth.demoCodeHint}
-              </p>
-              <div className="text-lg text-blue-800 font-mono bg-white rounded px-3 py-2 text-center tracking-widest">
-                {MOCK_RESET_CODE}
-              </div>
-            </div>
-          </div>
         </div>
 
         {/* Verify Card */}
@@ -201,7 +176,6 @@ export function VerifyResetCode() {
 
             {/* Resend Code */}
             <div className="text-center space-y-3">
-              <p className="text-sm text-gray-600">{t.auth.havingTrouble}</p>
               <Button
                 type="button"
                 variant="outline"

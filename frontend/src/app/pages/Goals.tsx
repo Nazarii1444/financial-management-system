@@ -1,102 +1,78 @@
-import { useState } from 'react';
-import { Plus, Target, CheckCircle2, Trash2 } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Plus, Minus, Target, CheckCircle2, Trash2, Pencil, MoreVertical, RotateCcw, PiggyBank } from 'lucide-react';
+import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Progress } from '../components/ui/progress';
 import { Badge } from '../components/ui/badge';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '../components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/dialog';
 import { Label } from '../components/ui/label';
 import { Input } from '../components/ui/input';
-import { mockGoals } from '../data/mockData';
-import { Goal } from '../types';
+import { Textarea } from '../components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '../components/ui/dropdown-menu';
 import { useLanguage } from '../i18n/LanguageContext';
+import { fmt } from '../i18n/translations';
+import { useAuth } from '../context/AuthContext';
+import { notifyDataChanged, useApi } from '../hooks/useApi';
+import { currenciesApi, goalsApi } from '../lib/api';
+import { errorMessage } from '../lib/errors';
+import { convert, daysUntil, fromDateInput, goalAppearance, toDateInput, toNumber } from '../lib/finance';
+import { AsyncBlock, EmptyState } from '../components/common/States';
+import { ConfirmDialog } from '../components/common/ConfirmDialog';
+import { GOAL_COLORS, GOAL_ICONS, GoalIcon } from '../components/common/GoalIcon';
+import { CURRENCIES, type GoalOut } from '../types/api';
 
-const goalIcons = [
-  { name: 'Shield', label: 'Emergency Fund' },
-  { name: 'Plane', label: 'Travel' },
-  { name: 'Laptop', label: 'Electronics' },
-  { name: 'Gift', label: 'Gifts' },
-  { name: 'Home', label: 'Home' },
-  { name: 'Car', label: 'Vehicle' },
-];
-
-const goalColors = [
-  '#3b82f6',
-  '#10b981',
-  '#8b5cf6',
-  '#f59e0b',
-  '#ec4899',
-  '#06b6d4',
-];
+type FundsMode = 'deposit' | 'withdraw';
 
 export function Goals() {
-  const [goals, setGoals] = useState(mockGoals);
-  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-  const [isAddFundsDialogOpen, setIsAddFundsDialogOpen] = useState(false);
-  const [selectedGoal, setSelectedGoal] = useState<Goal | null>(null);
+  const { t, formatMoney, formatDate } = useLanguage();
+  const { user } = useAuth();
+  const goals = useApi(() => goalsApi.list(), []);
+  const rates = useApi(() => currenciesApi.rates(), []);
 
-  const activeGoals = goals.filter((g) => !g.completed);
-  const completedGoals = goals.filter((g) => g.completed);
+  const [formOpen, setFormOpen] = useState(false);
+  const [editing, setEditing] = useState<GoalOut | null>(null);
+  const [funds, setFunds] = useState<{ goal: GoalOut; mode: FundsMode } | null>(null);
+  const [deleting, setDeleting] = useState<GoalOut | null>(null);
+  const [closing, setClosing] = useState<GoalOut | null>(null);
 
-  const handleCreateGoal = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const formData = new FormData(e.currentTarget);
+  const all = goals.data ?? [];
+  const activeGoals = all.filter((g) => !g.is_completed);
+  const completedGoals = all.filter((g) => g.is_completed);
+  const currency = user?.default_currency ?? 'USD';
+  const totalSaved = activeGoals.reduce(
+    (sum, g) => sum + convert(toNumber(g.saved_amount), g.currency, currency, rates.data),
+    0,
+  );
 
-    const newGoal: Goal = {
-      id: String(goals.length + 1),
-      budgetId: '1',
-      name: formData.get('name') as string,
-      targetAmount: Number(formData.get('targetAmount')),
-      currentAmount: 0,
-      currency: 'USD',
-      deadline: formData.get('deadline') as string,
-      color: formData.get('color') as string,
-      icon: formData.get('icon') as string,
-      completed: false,
-    };
-
-    setGoals([...goals, newGoal]);
-    setIsCreateDialogOpen(false);
+  const run = async (action: () => Promise<GoalOut | void>, success: string) => {
+    try {
+      const result = await action();
+      if (result && 'is_completed' in result && result.is_completed && success === t.goals.deposited) {
+        toast.success(fmt(t.goals.reached, { name: result.name }));
+      } else {
+        toast.success(success);
+      }
+      notifyDataChanged();
+    } catch (err) {
+      toast.error(errorMessage(err, t));
+    }
   };
 
-  const handleAddFunds = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    if (!selectedGoal) return;
-
-    const formData = new FormData(e.currentTarget);
-    const amount = Number(formData.get('amount'));
-
-    setGoals(
-      goals.map((g) =>
-        g.id === selectedGoal.id
-          ? {
-              ...g,
-              currentAmount: Math.min(g.currentAmount + amount, g.targetAmount),
-              completed: g.currentAmount + amount >= g.targetAmount,
-            }
-          : g
-      )
-    );
-
-    setIsAddFundsDialogOpen(false);
-    setSelectedGoal(null);
+  const handleComplete = (goal: GoalOut) => {
+    if (toNumber(goal.saved_amount) >= toNumber(goal.target_amount)) {
+      void run(() => goalsApi.close(goal.id_), t.goals.closed);
+    } else {
+      setClosing(goal);
+    }
   };
-
-  const handleCompleteGoal = (goalId: string) => {
-    setGoals(goals.map((g) => (g.id === goalId ? { ...g, completed: true } : g)));
-  };
-
-  const handleDeleteGoal = (goalId: string) => {
-    setGoals(goals.filter((g) => g.id !== goalId));
-  };
-
-  const { t, translateGoalIcon } = useLanguage();
 
   return (
     <div className="space-y-6">
@@ -104,99 +80,18 @@ export function Goals() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold text-gray-900">{t.goals.title}</h1>
-          <p className="text-sm text-gray-500 mt-1">
-            {t.goals.subtitle}
-          </p>
+          <p className="text-sm text-gray-500 mt-1">{t.goals.subtitle}</p>
         </div>
-        <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-          <DialogTrigger asChild>
-            <Button size="sm">
-              <Plus className="w-4 h-4 mr-2" />
-              {t.goals.createGoal}
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-md">
-            <DialogHeader>
-              <DialogTitle>{t.goals.createSavingsGoal}</DialogTitle>
-            </DialogHeader>
-            <form onSubmit={handleCreateGoal} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="name">{t.goals.goalName}</Label>
-                <Input
-                  id="name"
-                  name="name"
-                  placeholder={t.goals.goalNamePlaceholder}
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="targetAmount">{t.goals.targetAmount}</Label>
-                <Input
-                  id="targetAmount"
-                  name="targetAmount"
-                  type="number"
-                  step="0.01"
-                  placeholder="0.00"
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="deadline">{t.goals.deadline}</Label>
-                <Input id="deadline" name="deadline" type="date" />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="icon">{t.goals.icon}</Label>
-                <select
-                  id="icon"
-                  name="icon"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                  defaultValue="Shield"
-                  required
-                >
-                  {goalIcons.map((icon) => (
-                    <option key={icon.name} value={icon.name}>
-                      {translateGoalIcon(icon.label)}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="color">{t.goals.color}</Label>
-                <div className="flex gap-2">
-                  {goalColors.map((color) => (
-                    <label key={color} className="cursor-pointer">
-                      <input
-                        type="radio"
-                        name="color"
-                        value={color}
-                        className="sr-only peer"
-                        defaultChecked={color === goalColors[0]}
-                        required
-                      />
-                      <div
-                        className="w-10 h-10 rounded-full border-2 border-transparent peer-checked:border-gray-900 peer-checked:ring-2 peer-checked:ring-offset-2 peer-checked:ring-gray-900"
-                        style={{ backgroundColor: color }}
-                      />
-                    </label>
-                  ))}
-                </div>
-              </div>
-              <div className="flex gap-3 pt-4">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setIsCreateDialogOpen(false)}
-                  className="flex-1"
-                >
-                  {t.common.cancel}
-                </Button>
-                <Button type="submit" className="flex-1">
-                  {t.goals.createGoalButton}
-                </Button>
-              </div>
-            </form>
-          </DialogContent>
-        </Dialog>
+        <Button
+          size="sm"
+          onClick={() => {
+            setEditing(null);
+            setFormOpen(true);
+          }}
+        >
+          <Plus className="w-4 h-4 mr-2" />
+          {t.goals.createGoal}
+        </Button>
       </div>
 
       {/* Overview */}
@@ -206,9 +101,7 @@ export function Goals() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-500">{t.goals.activeGoals}</p>
-                <p className="text-3xl font-semibold text-gray-900 mt-2">
-                  {activeGoals.length}
-                </p>
+                <p className="text-3xl font-semibold text-gray-900 mt-2">{activeGoals.length}</p>
               </div>
               <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
                 <Target className="w-6 h-6 text-blue-600" />
@@ -222,27 +115,10 @@ export function Goals() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-500">{t.goals.totalSaved}</p>
-                <p className="text-3xl font-semibold text-gray-900 mt-2">
-                  $
-                  {activeGoals
-                    .reduce((sum, g) => sum + g.currentAmount, 0)
-                    .toLocaleString()}
-                </p>
+                <p className="text-3xl font-semibold text-gray-900 mt-2">{formatMoney(totalSaved, currency)}</p>
               </div>
               <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
-                <svg
-                  className="w-6 h-6 text-green-600"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"
-                  />
-                </svg>
+                <PiggyBank className="w-6 h-6 text-green-600" />
               </div>
             </div>
           </CardContent>
@@ -253,9 +129,7 @@ export function Goals() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-500">{t.goals.completedGoals}</p>
-                <p className="text-3xl font-semibold text-gray-900 mt-2">
-                  {completedGoals.length}
-                </p>
+                <p className="text-3xl font-semibold text-gray-900 mt-2">{completedGoals.length}</p>
               </div>
               <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center">
                 <CheckCircle2 className="w-6 h-6 text-purple-600" />
@@ -271,100 +145,123 @@ export function Goals() {
           <CardTitle>{t.goals.activeGoals}</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {activeGoals.map((goal) => {
-              const progress = (goal.currentAmount / goal.targetAmount) * 100;
-              const remaining = goal.targetAmount - goal.currentAmount;
+          <AsyncBlock state={goals}>
+            {() =>
+              activeGoals.length === 0 ? (
+                <EmptyState
+                  title={t.goals.noActiveGoals}
+                  action={
+                    <Button size="sm" onClick={() => setFormOpen(true)}>
+                      <Plus className="w-4 h-4 mr-2" />
+                      {t.goals.createGoal}
+                    </Button>
+                  }
+                />
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {activeGoals.map((goal, index) => {
+                    const look = goalAppearance.get(goal.id_, index);
+                    const saved = toNumber(goal.saved_amount);
+                    const target = toNumber(goal.target_amount);
+                    const progress = goal.progress_percent;
+                    const overdue = goal.deadline ? daysUntil(goal.deadline) < 0 : false;
 
-              return (
-                <div
-                  key={goal.id}
-                  className="p-6 rounded-xl border-2 border-gray-100 hover:border-gray-200 transition-colors"
-                  style={{
-                    background: `linear-gradient(135deg, ${goal.color}08 0%, ${goal.color}15 100%)`,
-                  }}
-                >
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="flex items-center gap-3">
+                    return (
                       <div
-                        className="w-12 h-12 rounded-full flex items-center justify-center"
-                        style={{ backgroundColor: `${goal.color}30` }}
+                        key={goal.id_}
+                        className="p-6 rounded-xl border-2 border-gray-100 hover:border-gray-200 transition-colors"
+                        style={{ background: `linear-gradient(135deg, ${look.color}08 0%, ${look.color}15 100%)` }}
                       >
-                        <GoalIcon name={goal.icon} color={goal.color} />
-                      </div>
-                      <div>
-                        <h3 className="font-semibold text-gray-900">{t.mockData[goal.name as keyof typeof t.mockData] || goal.name}</h3>
-                        {goal.deadline && (
-                          <p className="text-sm text-gray-500 mt-1">
-                            {t.goals.due}: {goal.deadline}
-                          </p>
+                        <div className="flex items-start justify-between mb-4">
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div className="w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: `${look.color}30` }}>
+                              <GoalIcon name={look.icon} color={look.color} />
+                            </div>
+                            <div className="min-w-0">
+                              <h3 className="font-semibold text-gray-900 truncate">{goal.name}</h3>
+                              {goal.deadline && (
+                                <p className={`text-sm mt-1 ${overdue ? 'text-red-600' : 'text-gray-500'}`}>
+                                  {overdue ? t.goals.overdue : t.goals.due}: {formatDate(goal.deadline)}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex gap-1">
+                            <Button size="sm" variant="ghost" title={t.goals.addFunds} onClick={() => setFunds({ goal, mode: 'deposit' })}>
+                              <Plus className="w-4 h-4" />
+                            </Button>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button size="sm" variant="ghost">
+                                  <MoreVertical className="w-4 h-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={() => setFunds({ goal, mode: 'withdraw' })} disabled={saved <= 0}>
+                                  <Minus className="w-4 h-4 mr-2" />
+                                  {t.goals.withdraw}
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={() => {
+                                    setEditing(goal);
+                                    setFormOpen(true);
+                                  }}
+                                >
+                                  <Pencil className="w-4 h-4 mr-2" />
+                                  {t.common.edit}
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleComplete(goal)}>
+                                  <CheckCircle2 className="w-4 h-4 mr-2" />
+                                  {t.goals.closeEarly}
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem className="text-red-600" onClick={() => setDeleting(goal)}>
+                                  <Trash2 className="w-4 h-4 mr-2" />
+                                  {t.common.delete}
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </div>
+                        </div>
+
+                        {goal.description && <p className="text-sm text-gray-600 mb-3">{goal.description}</p>}
+
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between">
+                            <span className="text-2xl font-semibold text-gray-900">{formatMoney(saved, goal.currency)}</span>
+                            <span className="text-sm text-gray-600">
+                              {t.goals.of} {formatMoney(target, goal.currency)}
+                            </span>
+                          </div>
+                          <Progress value={progress} className="h-3" style={{ '--progress-background': look.color } as React.CSSProperties} />
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm font-medium" style={{ color: look.color }}>
+                              {progress.toFixed(1)}% {t.goals.complete}
+                            </span>
+                            <span className="text-sm text-gray-600">
+                              {formatMoney(Math.max(target - saved, 0), goal.currency)} {t.goals.remaining}
+                            </span>
+                          </div>
+                        </div>
+
+                        {progress >= 100 && (
+                          <Button
+                            className="w-full mt-4"
+                            variant="outline"
+                            onClick={() => handleComplete(goal)}
+                            style={{ borderColor: look.color, color: look.color }}
+                          >
+                            <CheckCircle2 className="w-4 h-4 mr-2" />
+                            {t.goals.markAsCompleted}
+                          </Button>
                         )}
                       </div>
-                    </div>
-                    <div className="flex gap-2">
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => {
-                          setSelectedGoal(goal);
-                          setIsAddFundsDialogOpen(true);
-                        }}
-                      >
-                        <Plus className="w-4 h-4" />
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => handleDeleteGoal(goal.id)}
-                      >
-                        <Trash2 className="w-4 h-4 text-red-500" />
-                      </Button>
-                    </div>
-                  </div>
-
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-2xl font-semibold text-gray-900">
-                        ${goal.currentAmount.toLocaleString()}
-                      </span>
-                      <span className="text-sm text-gray-600">
-                        {t.goals.of} ${goal.targetAmount.toLocaleString()}
-                      </span>
-                    </div>
-                    <Progress
-                      value={progress}
-                      className="h-3"
-                      style={
-                        {
-                          '--progress-background': goal.color,
-                        } as React.CSSProperties
-                      }
-                    />
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium" style={{ color: goal.color }}>
-                        {progress.toFixed(1)}% {t.goals.complete}
-                      </span>
-                      <span className="text-sm text-gray-600">
-                        ${remaining.toLocaleString()} {t.goals.remaining}
-                      </span>
-                    </div>
-                  </div>
-
-                  {progress >= 100 && (
-                    <Button
-                      className="w-full mt-4"
-                      variant="outline"
-                      onClick={() => handleCompleteGoal(goal.id)}
-                      style={{ borderColor: goal.color, color: goal.color }}
-                    >
-                      <CheckCircle2 className="w-4 h-4 mr-2" />
-                      {t.goals.markAsCompleted}
-                    </Button>
-                  )}
+                    );
+                  })}
                 </div>
-              );
-            })}
-          </div>
+              )
+            }
+          </AsyncBlock>
         </CardContent>
       </Card>
 
@@ -377,20 +274,26 @@ export function Goals() {
           <CardContent>
             <div className="space-y-3">
               {completedGoals.map((goal) => (
-                <div
-                  key={goal.id}
-                  className="flex items-center justify-between p-4 rounded-lg bg-green-50 border border-green-100"
-                >
+                <div key={goal.id_} className="flex items-center justify-between p-4 rounded-lg bg-green-50 border border-green-100">
                   <div className="flex items-center gap-3">
                     <CheckCircle2 className="w-6 h-6 text-green-600" />
                     <div>
-                      <h4 className="font-medium text-gray-900">{t.mockData[goal.name as keyof typeof t.mockData] || goal.name}</h4>
+                      <h4 className="font-medium text-gray-900">{goal.name}</h4>
                       <p className="text-sm text-gray-600">
-                        ${goal.targetAmount.toLocaleString()} {t.goals.saved}
+                        {formatMoney(goal.saved_amount, goal.currency)} {t.goals.saved}
+                        {goal.completed_at && ` · ${formatDate(goal.completed_at)}`}
                       </p>
                     </div>
                   </div>
-                  <Badge className="bg-green-600">{t.goals.completed}</Badge>
+                  <div className="flex items-center gap-2">
+                    <Badge className="bg-green-600">{t.goals.completed}</Badge>
+                    <Button size="sm" variant="ghost" title={t.goals.reopen} onClick={() => run(() => goalsApi.reopen(goal.id_), t.goals.reopened)}>
+                      <RotateCcw className="w-4 h-4" />
+                    </Button>
+                    <Button size="sm" variant="ghost" title={t.common.delete} onClick={() => setDeleting(goal)}>
+                      <Trash2 className="w-4 h-4 text-red-500" />
+                    </Button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -398,126 +301,225 @@ export function Goals() {
         </Card>
       )}
 
-      {/* Add Funds Dialog */}
-      <Dialog open={isAddFundsDialogOpen} onOpenChange={setIsAddFundsDialogOpen}>
+      <GoalFormDialog open={formOpen} onOpenChange={setFormOpen} goal={editing} goalIndex={all.length} />
+
+      {/* Add / withdraw funds */}
+      <Dialog open={Boolean(funds)} onOpenChange={(open) => !open && setFunds(null)}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>
-              {t.goals.addFundsTo} {selectedGoal ? (t.mockData[selectedGoal.name as keyof typeof t.mockData] || selectedGoal.name) : ''}
+              {funds?.mode === 'withdraw' ? t.goals.withdrawFrom : t.goals.addFundsTo} «{funds?.goal.name}»
             </DialogTitle>
           </DialogHeader>
-          <form onSubmit={handleAddFunds} className="space-y-4">
+          <form
+            onSubmit={async (e) => {
+              e.preventDefault();
+              if (!funds) return;
+              const amount = Number(new FormData(e.currentTarget).get('amount'));
+              const { goal, mode } = funds;
+              setFunds(null);
+              await run(
+                () => (mode === 'deposit' ? goalsApi.deposit(goal.id_, amount) : goalsApi.withdraw(goal.id_, amount)),
+                mode === 'deposit' ? t.goals.deposited : t.goals.withdrawn,
+              );
+            }}
+            className="space-y-4"
+          >
             <div className="space-y-2">
-              <Label htmlFor="amount">{t.goals.amount}</Label>
-              <Input
-                id="amount"
-                name="amount"
-                type="number"
-                step="0.01"
-                placeholder="0.00"
-                required
-              />
-              {selectedGoal && (
+              <Label htmlFor="goal-amount">
+                {t.goals.amount} ({funds?.goal.currency})
+              </Label>
+              <Input id="goal-amount" name="amount" type="number" step="0.01" min="0.01" placeholder="0.00" autoFocus required />
+              {funds && (
                 <p className="text-sm text-gray-500">
-                  {t.goals.current}: ${selectedGoal.currentAmount.toLocaleString()} / {t.goals.target}: $
-                  {selectedGoal.targetAmount.toLocaleString()}
+                  {t.goals.current}: {formatMoney(funds.goal.saved_amount, funds.goal.currency)} / {t.goals.target}:{' '}
+                  {formatMoney(funds.goal.target_amount, funds.goal.currency)}
                 </p>
               )}
             </div>
             <div className="flex gap-3 pt-4">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => {
-                  setIsAddFundsDialogOpen(false);
-                  setSelectedGoal(null);
-                }}
-                className="flex-1"
-              >
+              <Button type="button" variant="outline" onClick={() => setFunds(null)} className="flex-1">
                 {t.common.cancel}
               </Button>
               <Button type="submit" className="flex-1">
-                {t.goals.addFunds}
+                {funds?.mode === 'withdraw' ? t.goals.withdraw : t.goals.addFunds}
               </Button>
             </div>
           </form>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        open={Boolean(deleting)}
+        onOpenChange={(open) => !open && setDeleting(null)}
+        description={deleting ? fmt(t.goals.deleteConfirm, { name: deleting.name }) : undefined}
+        onConfirm={async () => {
+          if (!deleting) return;
+          const id = deleting.id_;
+          await run(() => goalsApi.remove(id), t.goals.deleted);
+          goalAppearance.remove(id);
+        }}
+      />
+      <ConfirmDialog
+        open={Boolean(closing)}
+        onOpenChange={(open) => !open && setClosing(null)}
+        title={t.goals.closeEarly}
+        description={t.goals.closeEarlyConfirm}
+        confirmLabel={t.common.confirm}
+        destructive={false}
+        onConfirm={async () => {
+          if (closing) await run(() => goalsApi.close(closing.id_, true), t.goals.closed);
+        }}
+      />
     </div>
   );
 }
 
-function GoalIcon({ name, color }: { name: string; color: string }) {
-  const iconProps = { className: 'w-6 h-6', style: { color } };
+function GoalFormDialog({
+  open,
+  onOpenChange,
+  goal,
+  goalIndex,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  goal: GoalOut | null;
+  goalIndex: number;
+}) {
+  const { t } = useLanguage();
+  const { user } = useAuth();
+  const [currency, setCurrency] = useState('USD');
+  const [icon, setIcon] = useState<string>('Shield');
+  const [color, setColor] = useState(GOAL_COLORS[0]);
+  const [saving, setSaving] = useState(false);
 
-  switch (name) {
-    case 'Shield':
-      return (
-        <svg {...iconProps} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
-          />
-        </svg>
-      );
-    case 'Plane':
-      return (
-        <svg {...iconProps} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1 1H5a2 2 0 01-2-2zm9-13.5V9"
-          />
-        </svg>
-      );
-    case 'Laptop':
-      return (
-        <svg {...iconProps} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
-          />
-        </svg>
-      );
-    case 'Gift':
-      return (
-        <svg {...iconProps} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7"
-          />
-        </svg>
-      );
-    case 'Home':
-      return (
-        <svg {...iconProps} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"
-          />
-        </svg>
-      );
-    case 'Car':
-      return (
-        <svg {...iconProps} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M8 7h8M5 10h14a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2zm0 0l2-4h10l2 4M7 16h.01M17 16h.01"
-          />
-        </svg>
-      );
-    default:
-      return <Target {...iconProps} />;
-  }
+  useEffect(() => {
+    if (!open) return;
+    const look = goal ? goalAppearance.get(goal.id_) : { icon: 'Shield', color: GOAL_COLORS[goalIndex % GOAL_COLORS.length] };
+    setCurrency(goal?.currency ?? user?.default_currency ?? 'USD');
+    setIcon(look.icon);
+    setColor(look.color);
+  }, [open, goal, goalIndex, user?.default_currency]);
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const form = new FormData(e.currentTarget);
+    const deadline = String(form.get('deadline') ?? '');
+    const payload = {
+      name: String(form.get('name')).trim(),
+      target_amount: Number(form.get('targetAmount')),
+      currency,
+      description: String(form.get('description') ?? '').trim() || null,
+      deadline: deadline ? fromDateInput(deadline) : null,
+    };
+    setSaving(true);
+    try {
+      const saved = goal ? await goalsApi.update(goal.id_, payload) : await goalsApi.create(payload);
+      goalAppearance.set(saved.id_, { icon, color });
+      toast.success(goal ? t.goals.updated : t.goals.created);
+      onOpenChange(false);
+      notifyDataChanged();
+    } catch (err) {
+      toast.error(errorMessage(err, t));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>{goal ? t.goals.editGoal : t.goals.createSavingsGoal}</DialogTitle>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="goal-name">{t.goals.goalName}</Label>
+            <Input id="goal-name" name="name" maxLength={255} defaultValue={goal?.name} placeholder={t.goals.goalNamePlaceholder} required />
+          </div>
+          <div className="grid grid-cols-3 gap-3">
+            <div className="space-y-2 col-span-2">
+              <Label htmlFor="goal-target">{t.goals.targetAmount}</Label>
+              <Input
+                id="goal-target"
+                name="targetAmount"
+                type="number"
+                step="0.01"
+                min="0.01"
+                defaultValue={goal ? toNumber(goal.target_amount) : undefined}
+                placeholder="0.00"
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>{t.goals.currency}</Label>
+              <Select value={currency} onValueChange={setCurrency}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {CURRENCIES.map((c) => (
+                    <SelectItem key={c} value={c}>
+                      {c}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="goal-deadline">
+              {t.goals.deadline} <span className="text-gray-400 font-normal">({t.common.optional})</span>
+            </Label>
+            <Input id="goal-deadline" name="deadline" type="date" defaultValue={goal?.deadline ? toDateInput(goal.deadline) : undefined} />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="goal-description">
+              {t.goals.description} <span className="text-gray-400 font-normal">({t.common.optional})</span>
+            </Label>
+            <Textarea id="goal-description" name="description" maxLength={512} defaultValue={goal?.description ?? ''} placeholder={t.goals.descriptionPlaceholder} />
+          </div>
+          <div className="space-y-2">
+            <Label>{t.goals.icon}</Label>
+            <div className="flex gap-2 flex-wrap">
+              {GOAL_ICONS.map((name) => (
+                <button
+                  key={name}
+                  type="button"
+                  title={t.goalIcons[name]}
+                  onClick={() => setIcon(name)}
+                  className={`w-10 h-10 rounded-lg border-2 flex items-center justify-center ${icon === name ? 'border-gray-900' : 'border-gray-200'}`}
+                >
+                  <GoalIcon name={name} color={color} className="w-5 h-5" />
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label>{t.goals.color}</Label>
+            <div className="flex gap-2">
+              {GOAL_COLORS.map((c) => (
+                <button
+                  key={c}
+                  type="button"
+                  onClick={() => setColor(c)}
+                  className={`w-10 h-10 rounded-full border-2 ${color === c ? 'border-gray-900 ring-2 ring-offset-2 ring-gray-900' : 'border-transparent'}`}
+                  style={{ backgroundColor: c }}
+                />
+              ))}
+            </div>
+            <p className="text-xs text-gray-400">{t.goals.appearanceLocalHint}</p>
+          </div>
+          <div className="flex gap-3 pt-4">
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} className="flex-1">
+              {t.common.cancel}
+            </Button>
+            <Button type="submit" className="flex-1" disabled={saving}>
+              {saving ? t.common.saving : goal ? t.common.save : t.goals.createGoalButton}
+            </Button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
 }
