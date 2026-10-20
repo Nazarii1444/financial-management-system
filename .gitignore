@@ -37,3 +37,10 @@ venv/
 htmlcov/
 .mypy_cache/
 .ruff_cache/
+
+# Uploaded receipts (user data)
+uploads/
+backend/uploads/
+
+# Real bank statements used for local parser checks (personal data, never commit)
+backend/tests/files/fixtures/report_*

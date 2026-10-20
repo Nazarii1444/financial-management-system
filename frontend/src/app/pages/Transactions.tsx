@@ -16,13 +16,15 @@ import {
   Repeat,
   Pause,
   Play,
+  CalendarDays,
+  Receipt,
+  Trash,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Badge } from '../components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../components/ui/dialog';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -34,13 +36,17 @@ import { useLanguage } from '../i18n/LanguageContext';
 import { fmt } from '../i18n/translations';
 import { useAuth } from '../context/AuthContext';
 import { notifyDataChanged, useApi } from '../hooks/useApi';
-import { recurringApi, transactionsApi } from '../lib/api';
+import { exportsApi, recurringApi, transactionsApi, trashApi, type SearchFilters } from '../lib/api';
 import { errorMessage } from '../lib/errors';
-import { downloadCsv, endOfDay, kindFromKey, kindKey, toDateInput, toNumber, type KindKey } from '../lib/finance';
+import { endOfDay, kindFromKey, kindKey, toNumber, type KindKey } from '../lib/finance';
 import { AsyncBlock, EmptyState } from '../components/common/States';
 import { ConfirmDialog } from '../components/common/ConfirmDialog';
 import { TransactionFormDialog } from '../components/transactions/TransactionFormDialog';
-import type { RecurringOut, TransactionOut } from '../types/api';
+import { CalendarExportDialog, type CalendarTab } from '../components/transactions/CalendarExportDialog';
+import { TrashDialog } from '../components/transactions/TrashDialog';
+import { ExportDialog } from '../components/transactions/ExportDialog';
+import { ImportDialog } from '../components/transactions/ImportDialog';
+import { CURRENCIES, type RecurringOut, type TransactionOut } from '../types/api';
 
 const PAGE_SIZE = 50;
 
@@ -54,15 +60,31 @@ export function Transactions() {
   const [filterCategory, setFilterCategory] = useState('all');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
+  const [month, setMonth] = useState('');
+  const [amountMin, setAmountMin] = useState('');
+  const [amountMax, setAmountMax] = useState('');
+  const [currencyFilter, setCurrencyFilter] = useState('all');
+  const [receiptFilter, setReceiptFilter] = useState<'all' | 'with' | 'without'>('all');
+  const [debouncedQuery, setDebouncedQuery] = useState('');
   const [pages, setPages] = useState(1);
+  const [trashOpen, setTrashOpen] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
+
+  // Server-side search is typo-tolerant; wait for a pause in typing
+  useEffect(() => {
+    const id = setTimeout(() => {
+      setDebouncedQuery(searchQuery.trim());
+      setPages(1);
+    }, 300);
+    return () => clearTimeout(id);
+  }, [searchQuery]);
 
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<TransactionOut | null>(null);
-  const [deleting, setDeleting] = useState<TransactionOut | null>(null);
   const [deletingRecurring, setDeletingRecurring] = useState<RecurringOut | null>(null);
   const [importOpen, setImportOpen] = useState(false);
-  const [importing, setImporting] = useState(false);
-  const [importFile, setImportFile] = useState<File | null>(null);
+  const [calendarOpen, setCalendarOpen] = useState(false);
+  const [calendarTab, setCalendarTab] = useState<CalendarTab>('file');
 
   // /transactions?add=1 (from the dashboard) opens the form straight away
   useEffect(() => {
@@ -71,37 +93,57 @@ export function Transactions() {
       setFormOpen(true);
       setSearchParams({}, { replace: true });
     }
+    // Back from Google consent: /transactions?gcal=connected|denied|error|sync_error
+    const gcal = searchParams.get('gcal');
+    if (gcal) {
+      const messages: Record<string, [boolean, string]> = {
+        connected: [true, t.calendar.connected],
+        denied: [false, t.calendar.connectDenied],
+        sync_error: [false, t.calendar.syncError],
+      };
+      const [ok, message] = messages[gcal] ?? [false, t.calendar.connectError];
+      if (ok) toast.success(message);
+      else toast.error(message);
+      setCalendarTab('google');
+      setCalendarOpen(true);
+      setSearchParams({}, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams, setSearchParams]);
 
   const categories = useApi(() => transactionsApi.categories(), []);
   const limit = PAGE_SIZE * pages;
-  const transactions = useApi(
-    () =>
-      transactionsApi.list({
-        limit,
-        kind: filterType === 'all' ? undefined : kindFromKey(filterType),
-        category: filterCategory === 'all' ? undefined : filterCategory,
-        date_from: dateFrom ? new Date(`${dateFrom}T00:00:00`).toISOString() : undefined,
-        date_to: dateTo ? endOfDay(new Date(`${dateTo}T00:00:00`)).toISOString() : undefined,
-      }),
-    [limit, filterType, filterCategory, dateFrom, dateTo],
-  );
-  const recurring = useApi(() => recurringApi.list(), []);
+  const searchFilters = useMemo<SearchFilters>(() => {
+    const num = (v: string) => (v.trim() === '' || Number.isNaN(Number(v)) ? undefined : Number(v));
+    return {
+      q: debouncedQuery || undefined,
+      kind: filterType === 'all' ? undefined : kindFromKey(filterType),
+      category: filterCategory === 'all' ? undefined : filterCategory,
+      date_from: dateFrom ? new Date(`${dateFrom}T00:00:00`).toISOString() : undefined,
+      date_to: dateTo ? endOfDay(new Date(`${dateTo}T00:00:00`)).toISOString() : undefined,
+      amount_min: num(amountMin),
+      amount_max: num(amountMax),
+      currency: currencyFilter === 'all' ? undefined : currencyFilter,
+      has_receipt: receiptFilter === 'all' ? undefined : receiptFilter === 'with',
+    };
+  }, [debouncedQuery, filterType, filterCategory, dateFrom, dateTo, amountMin, amountMax, currencyFilter, receiptFilter]);
 
-  // Free-text search runs locally: the backend has no text search parameter
-  const filtered = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase();
-    const items = transactions.data ?? [];
-    if (!q) return items;
-    return items.filter(
-      (tx) =>
-        tx.name.toLowerCase().includes(q) ||
-        tx.category_name.includes(q) ||
-        translateCategory(tx.category_name).toLowerCase().includes(q) ||
-        (tx.note ?? '').toLowerCase().includes(q) ||
-        tx.tags.some((tag) => tag.includes(q)),
-    );
-  }, [transactions.data, searchQuery, translateCategory]);
+  const transactions = useApi(() => transactionsApi.search({ ...searchFilters, limit }), [searchFilters, limit]);
+  const recurring = useApi(() => recurringApi.list(), []);
+  const recurringCost = useApi(() => exportsApi.recurringSummary(), []);
+  const filtered = transactions.data?.items ?? [];
+  const totalFound = transactions.data?.total ?? 0;
+
+  // "Month" quick filter fills the period
+  const pickMonth = (value: string) => {
+    setMonth(value);
+    setPages(1);
+    if (!value) return;
+    const [y, m] = value.split('-').map(Number);
+    const pad = (n: number) => String(n).padStart(2, '0');
+    setDateFrom(`${value}-01`);
+    setDateTo(`${value}-${pad(new Date(y, m, 0).getDate())}`);
+  };
 
   const allCategories = useMemo(() => {
     const c = categories.data;
@@ -110,65 +152,48 @@ export function Transactions() {
     return [...new Set(list)].sort((a, b) => translateCategory(a).localeCompare(translateCategory(b)));
   }, [categories.data, filterType, translateCategory]);
 
-  const hasFilters = filterType !== 'all' || filterCategory !== 'all' || dateFrom || dateTo || searchQuery;
-  const canLoadMore = (transactions.data?.length ?? 0) >= limit && limit < 1000;
+  const hasFilters =
+    filterType !== 'all' || filterCategory !== 'all' || dateFrom || dateTo || searchQuery ||
+    amountMin || amountMax || currencyFilter !== 'all' || receiptFilter !== 'all';
+  const canLoadMore = filtered.length < totalFound && limit < 1000;
 
   const resetFilters = () => {
     setFilterType('all');
     setFilterCategory('all');
     setDateFrom('');
     setDateTo('');
+    setMonth('');
     setSearchQuery('');
+    setAmountMin('');
+    setAmountMax('');
+    setCurrencyFilter('all');
+    setReceiptFilter('all');
     setPages(1);
   };
 
-  const handleDelete = async () => {
-    if (!deleting) return;
+  const handleDelete = async (tx: TransactionOut) => {
     try {
-      await transactionsApi.remove(deleting.id_);
-      toast.success(t.transactions.deleted);
+      const deleted = await transactionsApi.remove(tx.id_);
+      toast.success(fmt(t.history.movedToTrash, { name: tx.name }), {
+        duration: 8000,
+        action: {
+          label: t.history.undo,
+          onClick: async () => {
+            try {
+              await trashApi.restore(deleted.trash_id);
+              toast.success(t.history.restored);
+              notifyDataChanged();
+              void refreshUser();
+            } catch (err) {
+              toast.error(errorMessage(err, t));
+            }
+          },
+        },
+      });
       notifyDataChanged();
       void refreshUser();
     } catch (err) {
       toast.error(errorMessage(err, t));
-    }
-  };
-
-  const handleExport = () => {
-    if (filtered.length === 0) {
-      toast.info(t.transactions.exportEmpty);
-      return;
-    }
-    downloadCsv(`transactions-${toDateInput()}.csv`, [
-      ['date', 'name', 'kind', 'category_name', 'amount', 'currency', 'tags', 'note'],
-      ...filtered.map((tx) => [
-        toDateInput(tx.date),
-        tx.name,
-        kindKey(tx.kind).toUpperCase(),
-        tx.category_name,
-        tx.amount,
-        tx.currency ?? '',
-        tx.tags.join('|'),
-        tx.note ?? '',
-      ]),
-    ]);
-  };
-
-  const handleImport = async () => {
-    const file = importFile;
-    if (!file) return;
-    setImporting(true);
-    try {
-      const result = await transactionsApi.import(file);
-      toast.success(fmt(t.transactions.importResult, { imported: result.imported, skipped: result.skipped }));
-      if (result.errors.length) toast.warning(result.errors.slice(0, 3).join('\n'));
-      setImportOpen(false);
-      notifyDataChanged();
-      void refreshUser();
-    } catch (err) {
-      toast.error(errorMessage(err, t));
-    } finally {
-      setImporting(false);
     }
   };
 
@@ -177,6 +202,7 @@ export function Transactions() {
       await recurringApi.update(rule.id_, { is_active: !rule.is_active });
       toast.success(t.transactions.recurringUpdated);
       recurring.reload();
+      recurringCost.reload();
     } catch (err) {
       toast.error(errorMessage(err, t));
     }
@@ -188,6 +214,7 @@ export function Transactions() {
       await recurringApi.remove(deletingRecurring.id_);
       toast.success(t.transactions.recurringDeleted);
       recurring.reload();
+      recurringCost.reload();
     } catch (err) {
       toast.error(errorMessage(err, t));
     }
@@ -207,17 +234,18 @@ export function Transactions() {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => {
-              setImportFile(null);
-              setImportOpen(true);
-            }}
+            onClick={() => setImportOpen(true)}
           >
             <Upload className="w-4 h-4 mr-2" />
             {t.transactions.import}
           </Button>
-          <Button variant="outline" size="sm" onClick={handleExport}>
+          <Button variant="outline" size="sm" onClick={() => setExportOpen(true)}>
             <Download className="w-4 h-4 mr-2" />
-            {t.transactions.export}
+            {t.history.export}
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => setTrashOpen(true)}>
+            <Trash className="w-4 h-4 mr-2" />
+            {t.history.trash}
           </Button>
           <Button
             size="sm"
@@ -239,7 +267,7 @@ export function Transactions() {
             <div className="flex-1 relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
               <Input
-                placeholder={t.transactions.searchPlaceholder}
+                placeholder={t.history.searchPlaceholder}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-10"
@@ -286,13 +314,103 @@ export function Transactions() {
           </div>
           <div className="flex flex-wrap items-center gap-3 text-sm">
             <label className="flex items-center gap-2 text-gray-600">
+              {t.history.month}
+              <Input type="month" className="w-[160px]" value={month} onChange={(e) => pickMonth(e.target.value)} />
+            </label>
+            <label className="flex items-center gap-2 text-gray-600">
               {t.transactions.from}
-              <Input type="date" className="w-[160px]" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
+              <Input
+                type="date"
+                className="w-[160px]"
+                value={dateFrom}
+                onChange={(e) => {
+                  setDateFrom(e.target.value);
+                  setMonth('');
+                  setPages(1);
+                }}
+              />
             </label>
             <label className="flex items-center gap-2 text-gray-600">
               {t.transactions.to}
-              <Input type="date" className="w-[160px]" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
+              <Input
+                type="date"
+                className="w-[160px]"
+                value={dateTo}
+                onChange={(e) => {
+                  setDateTo(e.target.value);
+                  setMonth('');
+                  setPages(1);
+                }}
+              />
             </label>
+          </div>
+          <div className="flex flex-wrap items-center gap-3 text-sm">
+            <label className="flex items-center gap-2 text-gray-600">
+              {t.history.amountFrom}
+              <Input
+                type="number"
+                min="0"
+                step="0.01"
+                inputMode="decimal"
+                className="w-[110px]"
+                value={amountMin}
+                onChange={(e) => {
+                  setAmountMin(e.target.value);
+                  setPages(1);
+                }}
+              />
+            </label>
+            <label className="flex items-center gap-2 text-gray-600">
+              {t.history.amountTo}
+              <Input
+                type="number"
+                min="0"
+                step="0.01"
+                inputMode="decimal"
+                className="w-[110px]"
+                value={amountMax}
+                onChange={(e) => {
+                  setAmountMax(e.target.value);
+                  setPages(1);
+                }}
+              />
+            </label>
+            <Select
+              value={currencyFilter}
+              onValueChange={(value) => {
+                setCurrencyFilter(value);
+                setPages(1);
+              }}
+            >
+              <SelectTrigger className="w-[150px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{t.history.allCurrencies}</SelectItem>
+                {CURRENCIES.map((c) => (
+                  <SelectItem key={c} value={c}>
+                    {c}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select
+              value={receiptFilter}
+              onValueChange={(value: 'all' | 'with' | 'without') => {
+                setReceiptFilter(value);
+                setPages(1);
+              }}
+            >
+              <SelectTrigger className="w-[180px]">
+                <Receipt className="w-4 h-4 mr-2" />
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{t.history.receiptAny}</SelectItem>
+                <SelectItem value="with">{t.history.withReceipt}</SelectItem>
+                <SelectItem value="without">{t.history.withoutReceipt}</SelectItem>
+              </SelectContent>
+            </Select>
             {hasFilters && (
               <Button variant="ghost" size="sm" onClick={resetFilters}>
                 {t.transactions.clearFilters}
@@ -304,8 +422,25 @@ export function Transactions() {
 
       {/* Transactions List */}
       <Card className="border-0 shadow-sm">
-        <CardHeader>
-          <CardTitle>{fmt(t.transactions.count, { count: filtered.length })}</CardTitle>
+        <CardHeader className="flex flex-row items-baseline justify-between gap-4 flex-wrap">
+          <CardTitle>
+            {hasFilters ? fmt(t.history.found, { count: totalFound }) : fmt(t.transactions.count, { count: totalFound })}
+          </CardTitle>
+          {transactions.data && totalFound > 0 && (
+            <p className="text-sm text-gray-600" data-testid="search-totals">
+              <span className="text-red-600 font-medium">
+                {fmt(t.history.totalExpense, { amount: formatMoney(transactions.data.totals.expense, transactions.data.totals.currency) })}
+              </span>
+              {transactions.data.totals.income > 0 && (
+                <>
+                  {' · '}
+                  <span className="text-green-600 font-medium">
+                    {fmt(t.history.totalIncome, { amount: formatMoney(transactions.data.totals.income, transactions.data.totals.currency) })}
+                  </span>
+                </>
+              )}
+            </p>
+          )}
         </CardHeader>
         <CardContent>
           <AsyncBlock state={transactions}>
@@ -336,7 +471,14 @@ export function Transactions() {
                             )}
                           </div>
                           <div className="min-w-0">
-                            <h4 className="font-medium text-gray-900 truncate">{tx.name}</h4>
+                            <h4 className="font-medium text-gray-900 truncate flex items-center gap-1.5">
+                              {tx.name}
+                              {tx.has_receipt && (
+                                <Receipt className="w-4 h-4 text-gray-400 shrink-0" aria-label={t.history.hasReceipt}>
+                                  <title>{t.history.hasReceipt}</title>
+                                </Receipt>
+                              )}
+                            </h4>
                             <div className="flex items-center gap-2 mt-1 flex-wrap">
                               <span className="text-sm text-gray-500">{translateCategory(tx.category_name)}</span>
                               {tx.tags.length > 0 && (
@@ -384,7 +526,7 @@ export function Transactions() {
                                 {t.common.edit}
                               </DropdownMenuItem>
                               <DropdownMenuSeparator />
-                              <DropdownMenuItem className="text-red-600" onClick={() => setDeleting(tx)}>
+                              <DropdownMenuItem className="text-red-600" onClick={() => handleDelete(tx)}>
                                 <Trash2 className="w-4 h-4 mr-2" />
                                 {t.common.delete}
                               </DropdownMenuItem>
@@ -410,12 +552,41 @@ export function Transactions() {
 
       {/* Recurring payments */}
       <Card className="border-0 shadow-sm">
-        <CardHeader>
-          <div className="flex items-center gap-2">
-            <Repeat className="w-5 h-5 text-blue-600" />
-            <CardTitle>{t.transactions.recurring}</CardTitle>
+        <CardHeader className="flex flex-row items-start justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-2">
+              <Repeat className="w-5 h-5 text-blue-600" />
+              <CardTitle>{t.transactions.recurring}</CardTitle>
+            </div>
+            <p className="text-xs text-gray-500 mt-1.5">{t.transactions.recurringHint}</p>
+            {recurringCost.data && toNumber(recurringCost.data.expense_per_year) > 0 && (
+              <p className="text-sm text-gray-700 mt-2" data-testid="recurring-cost">
+                {fmt(t.history.recurringCost, {
+                  month: formatMoney(toNumber(recurringCost.data.expense_per_month), recurringCost.data.currency),
+                  year: formatMoney(toNumber(recurringCost.data.expense_per_year), recurringCost.data.currency),
+                })}
+                {toNumber(recurringCost.data.subscriptions_per_year) > 0 && (
+                  <span className="text-gray-500">
+                    {' · '}
+                    {fmt(t.history.subscriptionsCost, {
+                      amount: formatMoney(toNumber(recurringCost.data.subscriptions_per_year), recurringCost.data.currency),
+                    })}
+                  </span>
+                )}
+              </p>
+            )}
           </div>
-          <p className="text-xs text-gray-500">{t.transactions.recurringHint}</p>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => {
+              setCalendarTab('file');
+              setCalendarOpen(true);
+            }}
+          >
+            <CalendarDays className="w-4 h-4 mr-1" />
+            {t.calendar.button}
+          </Button>
         </CardHeader>
         <CardContent>
           <AsyncBlock state={recurring}>
@@ -471,14 +642,22 @@ export function Transactions() {
         </CardContent>
       </Card>
 
+      <TrashDialog open={trashOpen} onOpenChange={setTrashOpen} />
+      <ExportDialog
+        open={exportOpen}
+        onOpenChange={setExportOpen}
+        filters={searchFilters}
+        matchCount={totalFound}
+        month={month || new Date().toISOString().slice(0, 7)}
+      />
+      <CalendarExportDialog
+        open={calendarOpen}
+        onOpenChange={setCalendarOpen}
+        activeRules={(recurring.data ?? []).filter((r) => r.is_active).length}
+        initialTab={calendarTab}
+      />
       <TransactionFormDialog open={formOpen} onOpenChange={setFormOpen} categories={categories.data} transaction={editing} />
 
-      <ConfirmDialog
-        open={Boolean(deleting)}
-        onOpenChange={(open) => !open && setDeleting(null)}
-        description={deleting ? fmt(t.transactions.deleteConfirm, { name: deleting.name }) : undefined}
-        onConfirm={handleDelete}
-      />
       <ConfirmDialog
         open={Boolean(deletingRecurring)}
         onOpenChange={(open) => !open && setDeletingRecurring(null)}
@@ -487,25 +666,7 @@ export function Transactions() {
       />
 
       {/* Import */}
-      <Dialog open={importOpen} onOpenChange={setImportOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>{t.transactions.importTitle}</DialogTitle>
-            <DialogDescription>{t.transactions.importDescription}</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <Input type="file" accept=".csv,.xlsx,.xls" onChange={(e) => setImportFile(e.target.files?.[0] ?? null)} />
-            <div className="flex gap-3">
-              <Button variant="outline" className="flex-1" onClick={() => setImportOpen(false)}>
-                {t.common.cancel}
-              </Button>
-              <Button className="flex-1" onClick={handleImport} disabled={importing || !importFile}>
-                {importing ? t.transactions.importing : t.transactions.importButton}
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <ImportDialog open={importOpen} onOpenChange={setImportOpen} categories={categories.data} />
     </div>
   );
 }

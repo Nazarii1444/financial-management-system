@@ -11,6 +11,7 @@ import { useLanguage } from '../i18n/LanguageContext';
 import { LanguageSelector } from '../components/auth/LanguageSelector';
 import { oauthLoginUrl } from '../lib/api';
 import { errorMessage } from '../lib/errors';
+import { PasswordStrengthMeter } from '../components/security/PasswordStrengthMeter';
 
 export function Register() {
   const [showPassword, setShowPassword] = useState(false);
@@ -39,11 +40,9 @@ export function Register() {
     return emailRegex.test(email);
   };
 
-  const validatePassword = (password: string): boolean => {
-    // Mirrors backend check_password_strength: 8+ chars, upper, lower, digit, special
-    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&]).{8,}$/;
-    return passwordRegex.test(password);
-  };
+  // Server rules (src/security/password_policy.py) via the live meter; the leak check runs on submit
+  const [passwordAcceptable, setPasswordAcceptable] = useState<boolean | null>(null);
+  const validatePassword = (password: string): boolean => password.length >= 10 && passwordAcceptable !== false;
 
   const validateForm = (): boolean => {
     const newErrors: {
@@ -242,11 +241,9 @@ export function Register() {
                     </svg>
                     {errors.password}
                   </p>
-                ) : (
-                  <p className="text-xs text-gray-500">
-                    {t.auth.passwordRequirements}
-                  </p>
-                )}
+                ) : null}
+                <PasswordStrengthMeter password={formData.password} username={formData.name.trim()} email={formData.email.trim()}
+                  onResult={setPasswordAcceptable} />
               </div>
 
               <div className="space-y-2">

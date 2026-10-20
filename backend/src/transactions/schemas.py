@@ -47,6 +47,45 @@ class TransactionOut(BaseModel):
         orm_mode = True
 
 
+class TransactionSearchItem(TransactionOut):
+    has_receipt: bool = False
+
+
+class SearchTotals(BaseModel):
+    expense: float      # in the user's default currency
+    income: float
+    net: float
+    currency: str
+
+
+class TransactionSearchOut(BaseModel):
+    items: List[TransactionSearchItem]
+    total: int          # matches before pagination
+    totals: SearchTotals
+
+
+class TrashItemOut(BaseModel):
+    id_: int                       # trash entry id (use for restore / purge)
+    transaction_id: int            # original transaction id (kept on restore)
+    name: str
+    amount: Decimal
+    kind: TransactionKind
+    category_name: str
+    currency: Optional[str]
+    date: Optional[datetime]
+    tags: List[str] = []
+    note: Optional[str] = None
+    has_receipt: bool = False
+    deleted_at: datetime
+    expires_at: datetime
+
+
+class TransactionDeletedOut(TransactionOut):
+    message: str
+    trash_id: int
+    expires_at: datetime
+
+
 # ── Recurring transactions ──────────────────────────────────────────────────
 
 class RecurringTransactionCreate(BaseModel):

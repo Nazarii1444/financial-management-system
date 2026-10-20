@@ -8,7 +8,7 @@ import { Textarea } from '../ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { useLanguage } from '../../i18n/LanguageContext';
 import { useAuth } from '../../context/AuthContext';
-import { recurringApi, transactionsApi } from '../../lib/api';
+import { recurringApi, templatesApi, transactionsApi } from '../../lib/api';
 import { errorMessage } from '../../lib/errors';
 import { fromDateInput, kindFromKey, kindKey, parseTags, toDateInput, toNumber, type KindKey } from '../../lib/finance';
 import { notifyDataChanged } from '../../hooks/useApi';
@@ -44,6 +44,7 @@ export function TransactionFormDialog({ open, onOpenChange, categories, transact
   const [category, setCategory] = useState('');
   const [currency, setCurrency] = useState('USD');
   const [recurring, setRecurring] = useState(false);
+  const [asTemplate, setAsTemplate] = useState(false);
   const [frequency, setFrequency] = useState<RecurringFrequency>('MONTHLY');
   const [saving, setSaving] = useState(false);
 
@@ -54,6 +55,7 @@ export function TransactionFormDialog({ open, onOpenChange, categories, transact
     setCategory(transaction?.category_name ?? '');
     setCurrency(transaction?.currency || user?.default_currency || 'USD');
     setRecurring(false);
+    setAsTemplate(false);
     setFrequency('MONTHLY');
   }, [open, transaction, user?.default_currency]);
 
@@ -89,7 +91,12 @@ export function TransactionFormDialog({ open, onOpenChange, categories, transact
           const { date: _date, ...rest } = payload;
           await recurringApi.create({ ...rest, frequency, first_run: nextRun(date, frequency) });
         }
-        toast.success(recurring ? `${t.transactions.created}. ${t.transactions.recurringCreated}` : t.transactions.created);
+        if (asTemplate) {
+          const { date: _date, ...rest } = payload;
+          await templatesApi.create(rest);
+        }
+        const extras = [recurring && t.transactions.recurringCreated, asTemplate && t.templates.created].filter(Boolean);
+        toast.success([t.transactions.created, ...extras].join('. '));
       }
       onOpenChange(false);
       notifyDataChanged();
@@ -226,6 +233,18 @@ export function TransactionFormDialog({ open, onOpenChange, categories, transact
                   </Select>
                 </div>
               )}
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="tx-as-template"
+                  className="rounded"
+                  checked={asTemplate}
+                  onChange={(e) => setAsTemplate(e.target.checked)}
+                />
+                <Label htmlFor="tx-as-template" className="text-sm cursor-pointer">
+                  {t.templates.saveAsTemplate}
+                </Label>
+              </div>
             </div>
           )}
           <div className="flex gap-3 pt-2">

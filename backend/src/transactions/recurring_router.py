@@ -9,11 +9,12 @@ from datetime import datetime, timezone, timedelta
 from typing import List
 
 from dateutil.relativedelta import relativedelta
-from fastapi import APIRouter, Depends, FastAPI, HTTPException, Query, status
+from fastapi import APIRouter, BackgroundTasks, Depends, FastAPI, HTTPException, Query, status
 from fastapi_utilities import repeat_every
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.calendar_export.calendar_router import schedule_google_sync
 from src.config import logger
 from src.database import AsyncSessionLocal, get_db
 from src.dependencies import get_current_user
@@ -60,6 +61,7 @@ async def _get_user_rt_or_404(session: AsyncSession, rt_id: int, user_id: int) -
 @recurring_router.post("", response_model=RecurringTransactionOut, status_code=status.HTTP_201_CREATED)
 async def create_recurring(
     payload: RecurringTransactionCreate,
+    background: BackgroundTasks,
     session: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -80,6 +82,7 @@ async def create_recurring(
     session.add(rt)
     await session.commit()
     await session.refresh(rt)
+    schedule_google_sync(background, current_user.id_)
     return rt
 
 
@@ -111,6 +114,7 @@ async def get_recurring(
 async def update_recurring(
     rt_id: int,
     payload: RecurringTransactionUpdate,
+    background: BackgroundTasks,
     session: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -129,18 +133,21 @@ async def update_recurring(
 
     await session.commit()
     await session.refresh(rt)
+    schedule_google_sync(background, current_user.id_)
     return rt
 
 
 @recurring_router.delete("/{rt_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_recurring(
     rt_id: int,
+    background: BackgroundTasks,
     session: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     rt = await _get_user_rt_or_404(session, rt_id, current_user.id_)
     await session.delete(rt)
     await session.commit()
+    schedule_google_sync(background, current_user.id_)
     return None
 
 

@@ -6,7 +6,7 @@ from src.models import UserStatus
 class UserCreate(BaseModel):
     username: str = Field(min_length=3, max_length=64)
     email: EmailStr
-    password: str = Field(min_length=8)
+    password: str = Field(max_length=256)   # rules: src/security/password_policy.py
 
 
 class UserLogin(BaseModel):
@@ -40,7 +40,7 @@ class RefreshRequest(BaseModel):
 
 class PasswordChangeRequest(BaseModel):
     current_password: str
-    new_password: str = Field(min_length=8)
+    new_password: str = Field(max_length=256)
 
 
 class TwoFACompleteRequest(BaseModel):

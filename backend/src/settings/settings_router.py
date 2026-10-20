@@ -8,12 +8,13 @@ Sections
   /notifications      — per-event and per-channel notification toggles
   /subscription       — plan info + upgrade / downgrade
 """
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.database import get_db
 from src.dependencies import get_current_user
+from src.security.events import EventType, record_event
 from src.models import Currencies, NotificationPreferences, SubscriptionPlan, User
 from src.transactions.currency_converter import get_rates_map
 from src.settings.schemas import (
@@ -132,6 +133,7 @@ async def update_currency(
 )
 async def change_email(
     payload: EmailChangeRequest,
+    request: Request,
     session: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -152,8 +154,11 @@ async def change_email(
     if taken:
         raise HTTPException(status_code=409, detail="Email already registered")
 
+    old_email = current_user.email
     current_user.email = new_email
     await session.commit()
+    await record_event(session, current_user.id_, EventType.EMAIL_CHANGED, request,
+                       details={"from": old_email, "to": new_email})
     await session.refresh(current_user)
     return current_user
 

@@ -1,12 +1,19 @@
 import type {
+  Passkey,
+  PasskeyOptions,
+  PasswordHealth,
+  PasswordStrength,
+  SecurityEvents,
   BudgetComparisonOut,
   BudgetMemberOut,
   BudgetOut,
   BudgetRole,
   BudgetType,
   CategoriesList,
+  CalendarFeedOut,
   CategoryBreakdownOut,
   GoalOut,
+  GoogleCalendarStatus,
   ImportResult,
   LoginResponse,
   MonthlyTrendsOut,
@@ -15,10 +22,22 @@ import type {
   PeriodComparisonOut,
   RecurringInput,
   RecurringOut,
+  RecurringSummary,
+  SafeToSpendOut,
+  StatementImportResult,
+  StatementImportRow,
+  StatementPreview,
   SubscriptionOut,
+  TemplateInput,
+  TemplateOut,
+  TemplateSuggestion,
+  TemplateUseInput,
   TokenPair,
   TransactionInput,
+  TransactionDeletedOut,
   TransactionOut,
+  TransactionSearchOut,
+  TrashItem,
   TwoFASetup,
   TxKindValue,
   UserOut,
@@ -185,6 +204,33 @@ async function request<T>(path: string, options: RequestOptions = {}, retried = 
   return data as T;
 }
 
+/** Authenticated file download (PDF / CSV); saves it with the server-provided filename. */
+export async function downloadFile(path: string, query?: Query, headers: Record<string, string> = {}, retried = false): Promise<void> {
+  const access = tokenStore.get()?.access;
+  let res: Response;
+  try {
+    res = await fetch(buildUrl(path, query), { headers: { ...headers, ...(access ? { Authorization: `Bearer ${access}` } : {}) } });
+  } catch {
+    throw new ApiError(0, 'Network error');
+  }
+  if (res.status === 401 && !retried && (await refreshTokens())) return downloadFile(path, query, headers, true);
+  if (!res.ok) {
+    const data = await parseBody(res);
+    const detail = data && typeof data === 'object' && 'detail' in data ? (data as { detail: unknown }).detail : data;
+    throw new ApiError(res.status, detail);
+  }
+  const disposition = res.headers.get('Content-Disposition') ?? '';
+  const filename = /filename="?([^";]+)"?/.exec(disposition)?.[1] ?? 'download';
+  const url = URL.createObjectURL(await res.blob());
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
 const get = <T>(path: string, query?: Query) => request<T>(path, { query });
 const post = <T>(path: string, body?: unknown, query?: Query) => request<T>(path, { method: 'POST', body, query });
 const patch = <T>(path: string, body?: unknown) => request<T>(path, { method: 'PATCH', body });
@@ -226,17 +272,72 @@ export interface TransactionFilters {
   date_to?: string;
 }
 
+/** Filters of GET /transactions/search (also accepted by the CSV export) */
+export interface SearchFilters {
+  q?: string;
+  kind?: TxKindValue;
+  category?: string;
+  tags?: string;
+  date_from?: string;
+  date_to?: string;
+  amount_min?: number;
+  amount_max?: number;
+  currency?: string;
+  has_receipt?: boolean;
+}
+
 export const transactionsApi = {
   list: (filters: TransactionFilters = {}) => get<TransactionOut[]>('/transactions', { ...filters }),
   create: (input: TransactionInput) => post<TransactionOut>('/transactions', input),
   update: (id: number, input: Partial<TransactionInput>) => patch<TransactionOut>(`/transactions/${id}`, input),
-  remove: (id: number) => del<TransactionOut>(`/transactions/${id}`),
+  /** Moves to the trash; restore with trashApi.restore(result.trash_id) */
+  remove: (id: number) => del<TransactionDeletedOut>(`/transactions/${id}`),
+  search: (filters: SearchFilters & { limit?: number; offset?: number }) =>
+    get<TransactionSearchOut>('/transactions/search', { ...filters }),
   categories: () => get<CategoriesList>('/transactions/categories/list'),
   import: (file: File) => {
     const form = new FormData();
     form.append('file', file);
     return post<ImportResult>('/transactions/import', form);
   },
+  /** Bank statement (monobank PDF / CSV / XLSX) or app CSV / XLSX → reviewable rows; nothing is saved */
+  previewStatement: (file: File, passphrase?: string) => {
+    const form = new FormData();
+    form.append('file', file);
+    // Encrypted exports (.fhx): a form field, never the URL
+    if (passphrase) form.append('passphrase', passphrase);
+    return post<StatementPreview>('/transactions/import/statement/preview', form);
+  },
+  confirmStatement: (input: { bank: string; update_balance: boolean; rows: StatementImportRow[] }) =>
+    post<StatementImportResult>('/transactions/import/statement/confirm', input),
+};
+
+export const trashApi = {
+  list: () => get<TrashItem[]>('/transactions/trash'),
+  restore: (id: number) => post<TransactionOut>(`/transactions/trash/${id}/restore`),
+  purge: (id: number) => del(`/transactions/trash/${id}`),
+  empty: () => del('/transactions/trash'),
+};
+
+/**
+ * Optional export passphrase → request header (never the URL, so it stays out of logs and history).
+ * Percent-encoded: header values are Latin-1 and passphrases may be Cyrillic.
+ */
+const passphraseHeader = (passphrase?: string): Record<string, string> =>
+  passphrase ? { 'X-Export-Passphrase': encodeURIComponent(passphrase) } : {};
+
+export const exportsApi = {
+  transactionsCsv: (filters: SearchFilters, lang: string, passphrase?: string) =>
+    downloadFile('/exports/transactions.csv', { ...filters, lang }, passphraseHeader(passphrase)),
+  statementPdf: (month: string, lang: string, passphrase?: string) =>
+    downloadFile('/exports/reports/statement.pdf', { month, lang }, passphraseHeader(passphrase)),
+  expensesPdf: (month: string, lang: string, passphrase?: string) =>
+    downloadFile('/exports/reports/expenses.pdf', { month, lang }, passphraseHeader(passphrase)),
+  budgetsPdf: (month: string, lang: string, passphrase?: string) =>
+    downloadFile('/exports/reports/budgets.pdf', { month, lang }, passphraseHeader(passphrase)),
+  recurringPdf: (lang: string, passphrase?: string) =>
+    downloadFile('/exports/reports/recurring.pdf', { lang }, passphraseHeader(passphrase)),
+  recurringSummary: () => get<RecurringSummary>('/exports/reports/recurring'),
 };
 
 export const recurringApi = {
@@ -245,6 +346,29 @@ export const recurringApi = {
   update: (id: number, input: Partial<RecurringInput> & { is_active?: boolean }) =>
     patch<RecurringOut>(`/transactions/recurring/${id}`, input),
   remove: (id: number) => del(`/transactions/recurring/${id}`),
+};
+
+export const templatesApi = {
+  list: () => get<TemplateOut[]>('/templates'),
+  create: (input: TemplateInput) => post<TemplateOut>('/templates', input),
+  update: (id: number, input: Partial<TemplateInput>) => patch<TemplateOut>(`/templates/${id}`, input),
+  remove: (id: number) => del(`/templates/${id}`),
+  /** Creates a transaction dated now; returns it with new_capital */
+  use: (id: number, input: TemplateUseInput = {}) => post<TransactionOut>(`/templates/${id}/use`, input),
+  suggestions: () => get<TemplateSuggestion[]>('/templates/suggestions'),
+  dismissSuggestion: (key: string) => post<void>('/templates/suggestions/dismiss', { key }),
+};
+
+export const calendarApi = {
+  /** .ics text of all active recurring rules (one-off snapshot) */
+  downloadIcs: (lang: string) => get<string>('/calendar/recurring.ics', { lang }),
+  feed: () => get<CalendarFeedOut>('/calendar/feed'),
+  createFeed: (lang: string, rotate = false) => post<CalendarFeedOut>('/calendar/feed', undefined, { lang, rotate }),
+  revokeFeed: () => del('/calendar/feed'),
+  googleStatus: () => get<GoogleCalendarStatus>('/calendar/google/status'),
+  googleConnect: (lang: string) => post<{ auth_url: string }>('/calendar/google/connect', undefined, { lang }),
+  googleSync: () => post<{ synced: number; deleted: number; last_synced_at: string | null }>('/calendar/google/sync'),
+  googleDisconnect: () => del('/calendar/google'),
 };
 
 export interface BudgetInput {
@@ -298,6 +422,7 @@ export const analyticsApi = {
     get<CategoryBreakdownOut>('/analytics/breakdown/categories', { kind, ...range }),
   periodComparison: (range: Range & { mode: 'monthly' | 'yearly' | 'custom' }) =>
     get<PeriodComparisonOut>('/analytics/comparison/period', { ...range }),
+  safeToSpend: () => get<SafeToSpendOut>('/analytics/safe-to-spend'),
   budget: (budgetId: number, range: Range = {}) =>
     get<BudgetComparisonOut>(`/analytics/budgets/${budgetId}`, { ...range }),
 };
@@ -325,4 +450,25 @@ export const twoFaApi = {
   setup: () => post<TwoFASetup>('/2fa/setup'),
   verify: (code: string) => post<{ message: string }>('/2fa/verify', { code }),
   disable: (code: string) => post<{ message: string }>('/2fa/disable', { code }),
+};
+
+export const securityApi = {
+  events: (limit = 50, offset = 0) => get<SecurityEvents>('/security/events', { limit, offset }),
+  passwordHealth: () => get<PasswordHealth>('/security/password-health'),
+  checkPassword: (password: string) => post<PasswordHealth>('/security/password-health/check', { password }),
+  /** Offline checks only (no leak lookup) — for the live meter; works without login */
+  passwordStrength: (password: string, username?: string, email?: string) =>
+    request<PasswordStrength>('/security/password-strength', { method: 'POST', body: { password, username, email }, auth: false }),
+};
+
+export const passkeysApi = {
+  list: () => get<Passkey[]>('/passkeys'),
+  registerOptions: () => post<PasskeyOptions>('/passkeys/register/options'),
+  register: (challenge_id: string, credential: Record<string, unknown>, name?: string) =>
+    post<Passkey>('/passkeys/register', { challenge_id, credential, name }),
+  rename: (id: number, name: string) => patch<Passkey>(`/passkeys/${id}`, { name }),
+  remove: (id: number) => del(`/passkeys/${id}`),
+  loginOptions: () => request<PasskeyOptions>('/passkeys/login/options', { method: 'POST', auth: false }),
+  login: (challenge_id: string, credential: Record<string, unknown>) =>
+    request<TokenPair>('/passkeys/login', { method: 'POST', body: { challenge_id, credential }, auth: false }),
 };

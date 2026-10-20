@@ -112,6 +112,36 @@ class PeriodComparisonOut(BaseModel):
     currency: str
 
 
+# ── Safe-to-spend ─────────────────────────────────────────────────────────────
+
+class SafeToSpendGoalOut(BaseModel):
+    goal_id: int
+    name: str
+    saved: float                      # already in the jar (reporting currency)
+    monthly_contribution: float       # needed this month to hit the deadline
+    deadline: Optional[str]
+
+
+class SafeToSpendOut(BaseModel):
+    safe_to_spend_per_day: float      # how much can be spent per remaining day
+    available_to_spend: float         # balance + expected income − committed expenses
+    balance: float                    # current capital in the reporting currency
+    expected_income: float            # recurring income scheduled before month end
+    upcoming_expenses: float          # recurring expenses scheduled before month end
+    spent_this_month: float           # actual expenses month-to-date (context)
+    goal_reserved: float              # saved in active goal jars (still inside balance)
+    goal_contributions: float         # required goal contributions this month
+    goals: List[SafeToSpendGoalOut] = []
+    spent_today: float                # expenses dated today (user's timezone)
+    daily_limit: float                # today's allowance as of the start of the day
+    left_today: float                 # daily_limit − spent_today; negative = overspent
+    per_day_after_today: float        # allowance for each remaining day after today
+    days_remaining: int               # today through last day of month, inclusive
+    month_end: str                    # ISO date of the last day of the month
+    currency: str
+    as_of: str                        # ISO datetime the figures were computed
+
+
 # ── Budget comparison ─────────────────────────────────────────────────────────
 
 class BudgetCategorySpendOut(BaseModel):

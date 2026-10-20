@@ -24,6 +24,7 @@ from .schemas import (
     MonthlyTrendsOut,
     OverviewOut,
     PeriodComparisonOut,
+    SafeToSpendOut,
     TagBreakdownOut,
     YearlyTrendsOut,
 )
@@ -31,6 +32,7 @@ from .services.budget_comparison_service import BudgetComparisonService
 from .services.category_service import CategoryBreakdownService
 from .services.overview_service import OverviewService
 from .services.period_comparison_service import PeriodComparisonService
+from .services.safe_to_spend_service import SafeToSpendService
 from .services.tags_service import TagBreakdownService
 from .services.trends_service import TrendsService
 
@@ -67,7 +69,7 @@ async def get_overview(
     return result
 
 
-# ── 2. Monthly trends ─────────────────────────────────────────────────────────
+# ── 2. Overview ─────────────────────────────────────────────────────────
 
 @analytics_router.get(
     "/trends/monthly",
@@ -162,6 +164,28 @@ async def get_tag_breakdown(
     result = await TagBreakdownService(session, user, rates, currency).compute(
         kind=parse_kind_query(kind), date_from=date_from, date_to=date_to
     )
+    return result
+
+
+# ── 8. Safe-to-spend ──────────────────────────────────────────────────────────
+
+@analytics_router.get(
+    "/safe-to-spend",
+    response_model=SafeToSpendOut,
+    summary="How much can be safely spent per day for the rest of the month",
+    description=(
+        "Computes a daily discretionary allowance for the remainder of the current "
+        "calendar month:\n\n"
+        "`available_to_spend = balance + expected recurring income − committed "
+        "recurring expenses`, divided by the number of days left in the month "
+        "(today included). The month boundary uses the user's timezone when set."
+    ),
+)
+async def get_safe_to_spend(
+    ctx=Depends(_ctx),
+):
+    session, user, rates, currency = ctx
+    result = await SafeToSpendService(session, user, rates, currency).compute()
     return result
 
 

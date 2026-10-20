@@ -1,0 +1,1783 @@
+{
+  "meta": {
+    "started_at": "2026-10-18T17:49:13",
+    "git_sha": "94b8259",
+    "git_dirty": true,
+    "host": "http://127.0.0.1:8002",
+    "users": 20,
+    "spawn_rate": 20,
+    "duration_s": 15,
+    "warmup_s": 10,
+    "wait_s": 0.0,
+    "machine": "Windows 10, 8 CPU, Python 3.11.9",
+    "label": "run2",
+    "elapsed_s": 751
+  },
+  "endpoints": [
+    {
+      "endpoint": "health",
+      "group": "read",
+      "rows": [
+        {
+          "name": "GET /health/",
+          "requests": 11101,
+          "failures": 0,
+          "error_pct": 0.0,
+          "rps": 721.9,
+          "avg_ms": 21.1,
+          "p50_ms": 16.0,
+          "p95_ms": 47.0,
+          "p99_ms": 84.0,
+          "max_ms": 445.6332999980077
+        },
+        {
+          "name": "Aggregated",
+          "requests": 11101,
+          "failures": 0,
+          "error_pct": 0.0,
+          "rps": 721.9,
+          "avg_ms": 21.1,
+          "p50_ms": 16.0,
+          "p95_ms": 47.0,
+          "p99_ms": 84.0,
+          "max_ms": 445.6332999980077
+        }
+      ]
+    },
+    {
+      "endpoint": "users_me",
+      "group": "read",
+      "rows": [
+        {
+          "name": "GET /api/users/me",
+          "requests": 2118,
+          "failures": 0,
+          "error_pct": 0.0,
+          "rps": 139.0,
+          "avg_ms": 142.5,
+          "p50_ms": 66.0,
+          "p95_ms": 590.0,
+          "p99_ms": 1000.0,
+          "max_ms": 1643.6863000271842
+        },
+        {
+          "name": "Aggregated",
+          "requests": 2118,
+          "failures": 0,
+          "error_pct": 0.0,
+          "rps": 139.0,
+          "avg_ms": 142.5,
+          "p50_ms": 66.0,
+          "p95_ms": 590.0,
+          "p99_ms": 1000.0,
+          "max_ms": 1643.6863000271842
+        }
+      ]
+    },
+    {
+      "endpoint": "settings_profile",
+      "group": "read",
+      "rows": [
+        {
+          "name": "GET /api/settings/profile",
+          "requests": 3090,
+          "failures": 0,
+          "error_pct": 0.0,
+          "rps": 207.8,
+          "avg_ms": 95.1,
+          "p50_ms": 52.0,
+          "p95_ms": 350.0,
+          "p99_ms": 660.0,
+          "max_ms": 1170.2243000036106
+        },
+        {
+          "name": "Aggregated",
+          "requests": 3090,
+          "failures": 0,
+          "error_pct": 0.0,
+          "rps": 207.8,
+          "avg_ms": 95.1,
+          "p50_ms": 52.0,
+          "p95_ms": 350.0,
+          "p99_ms": 660.0,
+          "max_ms": 1170.2243000036106
+        }
+      ]
+    },
+    {
+      "endpoint": "settings_notifications",
+      "group": "read",
+      "rows": [
+        {
+          "name": "GET /api/settings/notifications",
+          "requests": 3686,
+          "failures": 0,
+          "error_pct": 0.0,
+          "rps": 251.1,
+          "avg_ms": 78.6,
+          "p50_ms": 38.0,
+          "p95_ms": 260.0,
+          "p99_ms": 630.0,
+          "max_ms": 982.008499908261
+        },
+        {
+          "name": "Aggregated",
+          "requests": 3686,
+          "failures": 0,
+          "error_pct": 0.0,
+          "rps": 251.1,
+          "avg_ms": 78.6,
+          "p50_ms": 38.0,
+          "p95_ms": 260.0,
+          "p99_ms": 630.0,
+          "max_ms": 982.008499908261
+        }
+      ]
+    },
+    {
+      "endpoint": "settings_subscription",
+      "group": "read",
+      "rows": [
+        {
+          "name": "GET /api/settings/subscription",
+          "requests": 3262,
+          "failures": 0,
+          "error_pct": 0.0,
+          "rps": 220.3,
+          "avg_ms": 89.4,
+          "p50_ms": 54.0,
+          "p95_ms": 320.0,
+          "p99_ms": 570.0,
+          "max_ms": 747.2944000037387
+        },
+        {
+          "name": "Aggregated",
+          "requests": 3262,
+          "failures": 0,
+          "error_pct": 0.0,
+          "rps": 220.3,
+          "avg_ms": 89.4,
+          "p50_ms": 54.0,
+          "p95_ms": 320.0,
+          "p99_ms": 570.0,
+          "max_ms": 747.2944000037387
+        }
+      ]
+    },
+    {
+      "endpoint": "currencies_list",
+      "group": "read",
+      "rows": [
+        {
+          "name": "GET /api/currencies",
+          "requests": 2681,
+          "failures": 0,
+          "error_pct": 0.0,
+          "rps": 168.2,
+          "avg_ms": 116.7,
+          "p50_ms": 61.0,
+          "p95_ms": 430.0,
+          "p99_ms": 750.0,
+          "max_ms": 910.73719994165
+        },
+        {
+          "name": "Aggregated",
+          "requests": 2681,
+          "failures": 0,
+          "error_pct": 0.0,
+          "rps": 168.2,
+          "avg_ms": 116.7,
+          "p50_ms": 61.0,
+          "p95_ms": 430.0,
+          "p99_ms": 750.0,
+          "max_ms": 910.73719994165
+        }
+      ]
+    },
+    {
+      "endpoint": "tx_categories",
+      "group": "read",
+      "rows": [
+        {
+          "name": "GET /api/transactions/categories/list",
+          "requests": 10732,
+          "failures": 0,
+          "error_pct": 0.0,
+          "rps": 721.3,
+          "avg_ms": 22.7,
+          "p50_ms": 21.0,
+          "p95_ms": 33.0,
+          "p99_ms": 49.0,
+          "max_ms": 184.99960005283356
+        },
+        {
+          "name": "Aggregated",
+          "requests": 10732,
+          "failures": 0,
+          "error_pct": 0.0,
+          "rps": 721.3,
+          "avg_ms": 22.7,
+          "p50_ms": 21.0,
+          "p95_ms": 33.0,
+          "p99_ms": 49.0,
+          "max_ms": 184.99960005283356
+        }
+      ]
+    },
+    {
+      "endpoint": "tx_list",
+      "group": "read",
+      "rows": [
+        {
+          "name": "GET /api/transactions",
+          "requests": 2051,
+          "failures": 0,
+          "error_pct": 0.0,
+          "rps": 127.7,
+          "avg_ms": 154.9,
+          "p50_ms": 120.0,
+          "p95_ms": 320.0,
+          "p99_ms": 820.0,
+          "max_ms": 1304.337100009434
+        },
+        {
+          "name": "Aggregated",
+          "requests": 2051,
+          "failures": 0,
+          "error_pct": 0.0,
+          "rps": 127.7,
+          "avg_ms": 154.9,
+          "p50_ms": 120.0,
+          "p95_ms": 320.0,
+          "p99_ms": 820.0,
+          "max_ms": 1304.337100009434
+        }
+      ]
+    },
+    {
+      "endpoint": "tx_list_filtered",
+      "group": "read",
+      "rows": [
+        {
+          "name": "GET /api/transactions?kind&category&date_from",
+          "requests": 2164,
+          "failures": 0,
+          "error_pct": 0.0,
+          "rps": 133.4,
+          "avg_ms": 147.9,
+          "p50_ms": 120.0,
+          "p95_ms": 280.0,
+          "p99_ms": 720.0,
+          "max_ms": 1256.785099976696
+        },
+        {
+          "name": "Aggregated",
+          "requests": 2164,
+          "failures": 0,
+          "error_pct": 0.0,
+          "rps": 133.4,
+          "avg_ms": 147.9,
+          "p50_ms": 120.0,
+          "p95_ms": 280.0,
+          "p99_ms": 720.0,
+          "max_ms": 1256.785099976696
+        }
+      ]
+    },
+    {
+      "endpoint": "tx_get",
+      "group": "read",
+      "rows": [
+        {
+          "name": "GET /api/transactions/{id}",
+          "requests": 2813,
+          "failures": 0,
+          "error_pct": 0.0,
+          "rps": 175.0,
+          "avg_ms": 112.8,
+          "p50_ms": 81.0,
+          "p95_ms": 280.0,
+          "p99_ms": 800.0,
+          "max_ms": 1061.3538000034168
+        },
+        {
+          "name": "Aggregated",
+          "requests": 2813,
+          "failures": 0,
+          "error_pct": 0.0,
+          "rps": 175.0,
+          "avg_ms": 112.8,
+          "p50_ms": 81.0,
+          "p95_ms": 280.0,
+          "p99_ms": 800.0,
+          "max_ms": 1061.3538000034168
+        }
+      ]
+    },
+    {
+      "endpoint": "tx_search_text",
+      "group": "read",
+      "rows": [
+        {
+          "name": "GET /api/transactions/search?q",
+          "requests": 30,
+          "failures": 0,
+          "error_pct": 0.0,
+          "rps": 1.7,
+          "avg_ms": 6008.1,
+          "p50_ms": 4900.0,
+          "p95_ms": 16000.0,
+          "p99_ms": 16000.0,
+          "max_ms": 15933.364700060338
+        },
+        {
+          "name": "Aggregated",
+          "requests": 30,
+          "failures": 0,
+          "error_pct": 0.0,
+          "rps": 1.7,
+          "avg_ms": 6008.1,
+          "p50_ms": 4900.0,
+          "p95_ms": 16000.0,
+          "p99_ms": 16000.0,
+          "max_ms": 15933.364700060338
+        }
+      ]
+    },
+    {
+      "endpoint": "tx_search_filtered",
+      "group": "read",
+      "rows": [
+        {
+          "name": "GET /api/transactions/search?filters",
+          "requests": 1584,
+          "failures": 0,
+          "error_pct": 0.0,
+          "rps": 98.4,
+          "avg_ms": 201.9,
+          "p50_ms": 160.0,
+          "p95_ms": 520.0,
+          "p99_ms": 980.0,
+          "max_ms": 1707.6851999154314
+        },
+        {
+          "name": "Aggregated",
+          "requests": 1584,
+          "failures": 0,
+          "error_pct": 0.0,
+          "rps": 98.4,
+          "avg_ms": 201.9,
+          "p50_ms": 160.0,
+          "p95_ms": 520.0,
+          "p99_ms": 980.0,
+          "max_ms": 1707.6851999154314
+        }
+      ]
+    },
+    {
+      "endpoint": "trash_list",
+      "group": "read",
+      "rows": [
+        {
+          "name": "GET /api/transactions/trash",
+          "requests": 3548,
+          "failures": 0,
+          "error_pct": 0.0,
+          "rps": 237.8,
+          "avg_ms": 83.4,
+          "p50_ms": 53.0,
+          "p95_ms": 230.0,
+          "p99_ms": 490.0,
+          "max_ms": 1586.2995000788942
+        },
+        {
+          "name": "Aggregated",
+          "requests": 3548,
+          "failures": 0,
+          "error_pct": 0.0,
+          "rps": 237.8,
+          "avg_ms": 83.4,
+          "p50_ms": 53.0,
+          "p95_ms": 230.0,
+          "p99_ms": 490.0,
+          "max_ms": 1586.2995000788942
+        }
+      ]
+    },
+    {
+      "endpoint": "recurring_list",
+      "group": "read",
+      "rows": [
+        {
+          "name": "GET /api/transactions/recurring",
+          "requests": 5113,
+          "failures": 0,
+          "error_pct": 0.0,
+          "rps": 322.4,
+          "avg_ms": 61.2,
+          "p50_ms": 41.0,
+          "p95_ms": 160.0,
+          "p99_ms": 390.0,
+          "max_ms": 839.3819999182597
+        },
+        {
+          "name": "Aggregated",
+          "requests": 5113,
+          "failures": 0,
+          "error_pct": 0.0,
+          "rps": 322.4,
+          "avg_ms": 61.2,
+          "p50_ms": 41.0,
+          "p95_ms": 160.0,
+          "p99_ms": 390.0,
+          "max_ms": 839.3819999182597
+        }
+      ]
+    },
+    {
+      "endpoint": "templates_list",
+      "group": "read",
+      "rows": [
+        {
+          "name": "GET /api/templates",
+          "requests": 5230,
+          "failures": 0,
+          "error_pct": 0.0,
+          "rps": 329.7,
+          "avg_ms": 58.8,
+          "p50_ms": 38.0,
+          "p95_ms": 170.0,
+          "p99_ms": 360.0,
+          "max_ms": 946.7385000316426
+        },
+        {
+          "name": "Aggregated",
+          "requests": 5230,
+          "failures": 0,
+          "error_pct": 0.0,
+          "rps": 329.7,
+          "avg_ms": 58.8,
+          "p50_ms": 38.0,
+          "p95_ms": 170.0,
+          "p99_ms": 360.0,
+          "max_ms": 946.7385000316426
+        }
+      ]
+    },
+    {
+      "endpoint": "templates_suggestions",
+      "group": "read",
+      "rows": [
+        {
+          "name": "GET /api/templates/suggestions",
+          "requests": 1526,
+          "failures": 0,
+          "error_pct": 0.0,
+          "rps": 95.5,
+          "avg_ms": 208.6,
+          "p50_ms": 180.0,
+          "p95_ms": 380.0,
+          "p99_ms": 850.0,
+          "max_ms": 2382.276099990122
+        },
+        {
+          "name": "Aggregated",
+          "requests": 1526,
+          "failures": 0,
+          "error_pct": 0.0,
+          "rps": 95.5,
+          "avg_ms": 208.6,
+          "p50_ms": 180.0,
+          "p95_ms": 380.0,
+          "p99_ms": 850.0,
+          "max_ms": 2382.276099990122
+        }
+      ]
+    },
+    {
+      "endpoint": "goals_list",
+      "group": "read",
+      "rows": [
+        {
+          "name": "GET /api/goals",
+          "requests": 2998,
+          "failures": 0,
+          "error_pct": 0.0,
+          "rps": 185.2,
+          "avg_ms": 106.8,
+          "p50_ms": 68.0,
+          "p95_ms": 300.0,
+          "p99_ms": 710.0,
+          "max_ms": 1113.3379000239074
+        },
+        {
+          "name": "Aggregated",
+          "requests": 2998,
+          "failures": 0,
+          "error_pct": 0.0,
+          "rps": 185.2,
+          "avg_ms": 106.8,
+          "p50_ms": 68.0,
+          "p95_ms": 300.0,
+          "p99_ms": 710.0,
+          "max_ms": 1113.3379000239074
+        }
+      ]
+    },
+    {
+      "endpoint": "budgets_list",
+      "group": "read",
+      "rows": [
+        {
+          "name": "GET /api/budgets",
+          "requests": 3683,
+          "failures": 0,
+          "error_pct": 0.0,
+          "rps": 228.3,
+          "avg_ms": 86.7,
+          "p50_ms": 64.0,
+          "p95_ms": 190.0,
+          "p99_ms": 540.0,
+          "max_ms": 966.9007000047714
+        },
+        {
+          "name": "Aggregated",
+          "requests": 3683,
+          "failures": 0,
+          "error_pct": 0.0,
+          "rps": 228.3,
+          "avg_ms": 86.7,
+          "p50_ms": 64.0,
+          "p95_ms": 190.0,
+          "p99_ms": 540.0,
+          "max_ms": 966.9007000047714
+        }
+      ]
+    },
+    {
+      "endpoint": "analytics_overview",
+      "group": "read",
+      "rows": [
+        {
+          "name": "GET /api/analytics/overview",
+          "requests": 356,
+          "failures": 0,
+          "error_pct": 0.0,
+          "rps": 22.1,
+          "avg_ms": 868.7,
+          "p50_ms": 540.0,
+          "p95_ms": 2800.0,
+          "p99_ms": 3100.0,
+          "max_ms": 3374.138900078833
+        },
+        {
+          "name": "Aggregated",
+          "requests": 356,
+          "failures": 0,
+          "error_pct": 0.0,
+          "rps": 22.1,
+          "avg_ms": 868.7,
+          "p50_ms": 540.0,
+          "p95_ms": 2800.0,
+          "p99_ms": 3100.0,
+          "max_ms": 3374.138900078833
+        }
+      ]
+    },
+    {
+      "endpoint": "analytics_trends_monthly",
+      "group": "read",
+      "rows": [
+        {
+          "name": "GET /api/analytics/trends/monthly",
+          "requests": 297,
+          "failures": 0,
+          "error_pct": 0.0,
+          "rps": 18.4,
+          "avg_ms": 1052.2,
+          "p50_ms": 800.0,
+          "p95_ms": 3100.0,
+          "p99_ms": 4300.0,
+          "max_ms": 4287.001100019552
+        },
+        {
+          "name": "Aggregated",
+          "requests": 297,
+          "failures": 0,
+          "error_pct": 0.0,
+          "rps": 18.4,
+          "avg_ms": 1052.2,
+          "p50_ms": 800.0,
+          "p95_ms": 3100.0,
+          "p99_ms": 4300.0,
+          "max_ms": 4287.001100019552
+        }
+      ]
+    },
+    {
+      "endpoint": "analytics_trends_yearly",
+      "group": "read",
+      "rows": [
+        {
+          "name": "GET /api/analytics/trends/yearly",
+          "requests": 372,
+          "failures": 0,
+          "error_pct": 0.0,
+          "rps": 23.3,
+          "avg_ms": 830.8,
+          "p50_ms": 520.0,
+          "p95_ms": 1500.0,
+          "p99_ms": 3300.0,
+          "max_ms": 3772.06590003334
+        },
+        {
+          "name": "Aggregated",
+          "requests": 372,
+          "failures": 0,
+          "error_pct": 0.0,
+          "rps": 23.3,
+          "avg_ms": 830.8,
+          "p50_ms": 520.0,
+          "p95_ms": 1500.0,
+          "p99_ms": 3300.0,
+          "max_ms": 3772.06590003334
+        }
+      ]
+    },
+    {
+      "endpoint": "analytics_comparison",
+      "group": "read",
+      "rows": [
+        {
+          "name": "GET /api/analytics/comparison/period",
+          "requests": 1727,
+          "failures": 0,
+          "error_pct": 0.0,
+          "rps": 108.5,
+          "avg_ms": 183.0,
+          "p50_ms": 150.0,
+          "p95_ms": 350.0,
+          "p99_ms": 880.0,
+          "max_ms": 1047.814799938351
+        },
+        {
+          "name": "Aggregated",
+          "requests": 1727,
+          "failures": 0,
+          "error_pct": 0.0,
+          "rps": 108.5,
+          "avg_ms": 183.0,
+          "p50_ms": 150.0,
+          "p95_ms": 350.0,
+          "p99_ms": 880.0,
+          "max_ms": 1047.814799938351
+        }
+      ]
+    },
+    {
+      "endpoint": "analytics_categories",
+      "group": "read",
+      "rows": [
+        {
+          "name": "GET /api/analytics/breakdown/categories",
+          "requests": 391,
+          "failures": 0,
+          "error_pct": 0.0,
+          "rps": 24.1,
+          "avg_ms": 813.3,
+          "p50_ms": 730.0,
+          "p95_ms": 1200.0,
+          "p99_ms": 2400.0,
+          "max_ms": 2760.784800047986
+        },
+        {
+          "name": "Aggregated",
+          "requests": 391,
+          "failures": 0,
+          "error_pct": 0.0,
+          "rps": 24.1,
+          "avg_ms": 813.3,
+          "p50_ms": 730.0,
+          "p95_ms": 1200.0,
+          "p99_ms": 2400.0,
+          "max_ms": 2760.784800047986
+        }
+      ]
+    },
+    {
+      "endpoint": "analytics_tags",
+      "group": "read",
+      "rows": [
+        {
+          "name": "GET /api/analytics/breakdown/tags",
+          "requests": 350,
+          "failures": 0,
+          "error_pct": 0.0,
+          "rps": 22.0,
+          "avg_ms": 892.6,
+          "p50_ms": 770.0,
+          "p95_ms": 2400.0,
+          "p99_ms": 2800.0,
+          "max_ms": 2874.2423999356106
+        },
+        {
+          "name": "Aggregated",
+          "requests": 350,
+          "failures": 0,
+          "error_pct": 0.0,
+          "rps": 22.0,
+          "avg_ms": 892.6,
+          "p50_ms": 770.0,
+          "p95_ms": 2400.0,
+          "p99_ms": 2800.0,
+          "max_ms": 2874.2423999356106
+        }
+      ]
+    },
+    {
+      "endpoint": "analytics_safe_to_spend",
+      "group": "read",
+      "rows": [
+        {
+          "name": "GET /api/analytics/safe-to-spend",
+          "requests": 2288,
+          "failures": 0,
+          "error_pct": 0.0,
+          "rps": 142.5,
+          "avg_ms": 139.9,
+          "p50_ms": 120.0,
+          "p95_ms": 230.0,
+          "p99_ms": 440.0,
+          "max_ms": 1014.9755999445915
+        },
+        {
+          "name": "Aggregated",
+          "requests": 2288,
+          "failures": 0,
+          "error_pct": 0.0,
+          "rps": 142.5,
+          "avg_ms": 139.9,
+          "p50_ms": 120.0,
+          "p95_ms": 230.0,
+          "p99_ms": 440.0,
+          "max_ms": 1014.9755999445915
+        }
+      ]
+    },
+    {
+      "endpoint": "analytics_budget",
+      "group": "read",
+      "rows": [
+        {
+          "name": "GET /api/analytics/budgets/{id}",
+          "requests": 352,
+          "failures": 0,
+          "error_pct": 0.0,
+          "rps": 21.7,
+          "avg_ms": 894.9,
+          "p50_ms": 810.0,
+          "p95_ms": 1200.0,
+          "p99_ms": 2900.0,
+          "max_ms": 3031.630099983886
+        },
+        {
+          "name": "Aggregated",
+          "requests": 352,
+          "failures": 0,
+          "error_pct": 0.0,
+          "rps": 21.7,
+          "avg_ms": 894.9,
+          "p50_ms": 810.0,
+          "p95_ms": 1200.0,
+          "p99_ms": 2900.0,
+          "max_ms": 3031.630099983886
+        }
+      ]
+    },
+    {
+      "endpoint": "export_recurring_json",
+      "group": "read",
+      "rows": [
+        {
+          "name": "GET /api/exports/reports/recurring",
+          "requests": 3288,
+          "failures": 0,
+          "error_pct": 0.0,
+          "rps": 205.7,
+          "avg_ms": 96.3,
+          "p50_ms": 74.0,
+          "p95_ms": 220.0,
+          "p99_ms": 570.0,
+          "max_ms": 881.8143999669701
+        },
+        {
+          "name": "Aggregated",
+          "requests": 3288,
+          "failures": 0,
+          "error_pct": 0.0,
+          "rps": 205.7,
+          "avg_ms": 96.3,
+          "p50_ms": 74.0,
+          "p95_ms": 220.0,
+          "p99_ms": 570.0,
+          "max_ms": 881.8143999669701
+        }
+      ]
+    },
+    {
+      "endpoint": "export_csv",
+      "group": "read",
+      "rows": [
+        {
+          "name": "GET /api/exports/transactions.csv",
+          "requests": 218,
+          "failures": 0,
+          "error_pct": 0.0,
+          "rps": 13.6,
+          "avg_ms": 1391.0,
+          "p50_ms": 1100.0,
+          "p95_ms": 3600.0,
+          "p99_ms": 3900.0,
+          "max_ms": 4050.647799973376
+        },
+        {
+          "name": "Aggregated",
+          "requests": 218,
+          "failures": 0,
+          "error_pct": 0.0,
+          "rps": 13.6,
+          "avg_ms": 1391.0,
+          "p50_ms": 1100.0,
+          "p95_ms": 3600.0,
+          "p99_ms": 3900.0,
+          "max_ms": 4050.647799973376
+        }
+      ]
+    },
+    {
+      "endpoint": "calendar_ics",
+      "group": "read",
+      "rows": [
+        {
+          "name": "GET /api/calendar/recurring.ics",
+          "requests": 2794,
+          "failures": 0,
+          "error_pct": 0.0,
+          "rps": 171.9,
+          "avg_ms": 115.4,
+          "p50_ms": 44.0,
+          "p95_ms": 430.0,
+          "p99_ms": 950.0,
+          "max_ms": 2087.471800041385
+        },
+        {
+          "name": "Aggregated",
+          "requests": 2794,
+          "failures": 0,
+          "error_pct": 0.0,
+          "rps": 171.9,
+          "avg_ms": 115.4,
+          "p50_ms": 44.0,
+          "p95_ms": 430.0,
+          "p99_ms": 950.0,
+          "max_ms": 2087.471800041385
+        }
+      ]
+    },
+    {
+      "endpoint": "tx_create_delete",
+      "group": "write",
+      "rows": [
+        {
+          "name": "POST /api/transactions",
+          "requests": 859,
+          "failures": 0,
+          "error_pct": 0.0,
+          "rps": 52.9,
+          "avg_ms": 177.9,
+          "p50_ms": 150.0,
+          "p95_ms": 370.0,
+          "p99_ms": 790.0,
+          "max_ms": 1130.5635999888182
+        },
+        {
+          "name": "DELETE /api/transactions/trash/{id}",
+          "requests": 841,
+          "failures": 0,
+          "error_pct": 0.0,
+          "rps": 51.8,
+          "avg_ms": 48.0,
+          "p50_ms": 44.0,
+          "p95_ms": 80.0,
+          "p99_ms": 130.0,
+          "max_ms": 593.3201999869198
+        },
+        {
+          "name": "DELETE /api/transactions/{id}",
+          "requests": 851,
+          "failures": 0,
+          "error_pct": 0.0,
+          "rps": 52.4,
+          "avg_ms": 154.0,
+          "p50_ms": 140.0,
+          "p95_ms": 300.0,
+          "p99_ms": 500.0,
+          "max_ms": 726.6404000110924
+        },
+        {
+          "name": "Aggregated",
+          "requests": 2551,
+          "failures": 0,
+          "error_pct": 0.0,
+          "rps": 157.0,
+          "avg_ms": 127.1,
+          "p50_ms": 100.0,
+          "p95_ms": 300.0,
+          "p99_ms": 530.0,
+          "max_ms": 1130.5635999888182
+        }
+      ]
+    },
+    {
+      "endpoint": "tx_update",
+      "group": "write",
+      "rows": [
+        {
+          "name": "PATCH /api/transactions/{id}",
+          "requests": 2095,
+          "failures": 0,
+          "error_pct": 0.0,
+          "rps": 128.4,
+          "avg_ms": 154.9,
+          "p50_ms": 120.0,
+          "p95_ms": 430.0,
+          "p99_ms": 710.0,
+          "max_ms": 1255.3369000088423
+        },
+        {
+          "name": "Aggregated",
+          "requests": 2095,
+          "failures": 0,
+          "error_pct": 0.0,
+          "rps": 128.4,
+          "avg_ms": 154.9,
+          "p50_ms": 120.0,
+          "p95_ms": 430.0,
+          "p99_ms": 710.0,
+          "max_ms": 1255.3369000088423
+        }
+      ]
+    },
+    {
+      "endpoint": "recurring_create_delete",
+      "group": "write",
+      "rows": [
+        {
+          "name": "POST /api/transactions/recurring",
+          "requests": 1210,
+          "failures": 0,
+          "error_pct": 0.0,
+          "rps": 75.0,
+          "avg_ms": 158.4,
+          "p50_ms": 120.0,
+          "p95_ms": 430.0,
+          "p99_ms": 740.0,
+          "max_ms": 966.7795000132173
+        },
+        {
+          "name": "DELETE /api/transactions/recurring/{id}",
+          "requests": 1201,
+          "failures": 0,
+          "error_pct": 0.0,
+          "rps": 74.5,
+          "avg_ms": 108.0,
+          "p50_ms": 77.0,
+          "p95_ms": 290.0,
+          "p99_ms": 600.0,
+          "max_ms": 778.4058999968693
+        },
+        {
+          "name": "Aggregated",
+          "requests": 2411,
+          "failures": 0,
+          "error_pct": 0.0,
+          "rps": 149.5,
+          "avg_ms": 133.3,
+          "p50_ms": 97.0,
+          "p95_ms": 350.0,
+          "p99_ms": 700.0,
+          "max_ms": 966.7795000132173
+        }
+      ]
+    },
+    {
+      "endpoint": "template_create_delete",
+      "group": "write",
+      "rows": [
+        {
+          "name": "POST /api/templates",
+          "requests": 1342,
+          "failures": 0,
+          "error_pct": 0.0,
+          "rps": 83.0,
+          "avg_ms": 140.1,
+          "p50_ms": 110.0,
+          "p95_ms": 390.0,
+          "p99_ms": 590.0,
+          "max_ms": 714.9553999770433
+        },
+        {
+          "name": "DELETE /api/templates/{id}",
+          "requests": 1330,
+          "failures": 0,
+          "error_pct": 0.0,
+          "rps": 82.3,
+          "avg_ms": 100.9,
+          "p50_ms": 74.0,
+          "p95_ms": 240.0,
+          "p99_ms": 470.0,
+          "max_ms": 556.0542000457644
+        },
+        {
+          "name": "Aggregated",
+          "requests": 2672,
+          "failures": 0,
+          "error_pct": 0.0,
+          "rps": 165.3,
+          "avg_ms": 120.6,
+          "p50_ms": 98.0,
+          "p95_ms": 340.0,
+          "p99_ms": 530.0,
+          "max_ms": 714.9553999770433
+        }
+      ]
+    },
+    {
+      "endpoint": "template_use",
+      "group": "write",
+      "rows": [
+        {
+          "name": "POST /api/templates/{id}/use",
+          "requests": 725,
+          "failures": 0,
+          "error_pct": 0.0,
+          "rps": 45.6,
+          "avg_ms": 219.1,
+          "p50_ms": 180.0,
+          "p95_ms": 530.0,
+          "p99_ms": 840.0,
+          "max_ms": 1343.4654000448063
+        },
+        {
+          "name": "DELETE /api/transactions/trash/{id}",
+          "requests": 711,
+          "failures": 0,
+          "error_pct": 0.0,
+          "rps": 44.7,
+          "avg_ms": 45.6,
+          "p50_ms": 47.0,
+          "p95_ms": 81.0,
+          "p99_ms": 100.0,
+          "max_ms": 304.4339999323711
+        },
+        {
+          "name": "DELETE /api/transactions/{id}",
+          "requests": 713,
+          "failures": 0,
+          "error_pct": 0.0,
+          "rps": 44.8,
+          "avg_ms": 173.6,
+          "p50_ms": 150.0,
+          "p95_ms": 380.0,
+          "p99_ms": 590.0,
+          "max_ms": 924.8806000687182
+        },
+        {
+          "name": "Aggregated",
+          "requests": 2149,
+          "failures": 0,
+          "error_pct": 0.0,
+          "rps": 135.1,
+          "avg_ms": 146.6,
+          "p50_ms": 120.0,
+          "p95_ms": 390.0,
+          "p99_ms": 650.0,
+          "max_ms": 1343.4654000448063
+        }
+      ]
+    },
+    {
+      "endpoint": "goal_create_delete",
+      "group": "write",
+      "rows": [
+        {
+          "name": "POST /api/goals",
+          "requests": 1141,
+          "failures": 0,
+          "error_pct": 0.0,
+          "rps": 70.2,
+          "avg_ms": 165.0,
+          "p50_ms": 130.0,
+          "p95_ms": 450.0,
+          "p99_ms": 750.0,
+          "max_ms": 900.9268999798223
+        },
+        {
+          "name": "DELETE /api/goals/{id}",
+          "requests": 1125,
+          "failures": 0,
+          "error_pct": 0.0,
+          "rps": 69.2,
+          "avg_ms": 120.1,
+          "p50_ms": 83.0,
+          "p95_ms": 340.0,
+          "p99_ms": 620.0,
+          "max_ms": 811.6810999345034
+        },
+        {
+          "name": "Aggregated",
+          "requests": 2266,
+          "failures": 0,
+          "error_pct": 0.0,
+          "rps": 139.5,
+          "avg_ms": 142.7,
+          "p50_ms": 110.0,
+          "p95_ms": 410.0,
+          "p99_ms": 710.0,
+          "max_ms": 900.9268999798223
+        }
+      ]
+    },
+    {
+      "endpoint": "goal_deposit_withdraw",
+      "group": "write",
+      "rows": [
+        {
+          "name": "POST /api/goals/{id}/deposit",
+          "requests": 1124,
+          "failures": 0,
+          "error_pct": 0.0,
+          "rps": 75.5,
+          "avg_ms": 136.6,
+          "p50_ms": 120.0,
+          "p95_ms": 210.0,
+          "p99_ms": 760.0,
+          "max_ms": 1030.269900104031
+        },
+        {
+          "name": "POST /api/goals/{id}/withdraw",
+          "requests": 1116,
+          "failures": 0,
+          "error_pct": 0.0,
+          "rps": 75.0,
+          "avg_ms": 127.4,
+          "p50_ms": 120.0,
+          "p95_ms": 190.0,
+          "p99_ms": 360.0,
+          "max_ms": 700.1623000251129
+        },
+        {
+          "name": "Aggregated",
+          "requests": 2240,
+          "failures": 0,
+          "error_pct": 0.0,
+          "rps": 150.5,
+          "avg_ms": 132.1,
+          "p50_ms": 120.0,
+          "p95_ms": 200.0,
+          "p99_ms": 420.0,
+          "max_ms": 1030.269900104031
+        }
+      ]
+    },
+    {
+      "endpoint": "budget_create_delete",
+      "group": "write",
+      "rows": [
+        {
+          "name": "POST /api/budgets",
+          "requests": 1073,
+          "failures": 0,
+          "error_pct": 0.0,
+          "rps": 66.3,
+          "avg_ms": 171.9,
+          "p50_ms": 140.0,
+          "p95_ms": 310.0,
+          "p99_ms": 780.0,
+          "max_ms": 1452.68450002186
+        },
+        {
+          "name": "DELETE /api/budgets/{id}",
+          "requests": 1065,
+          "failures": 0,
+          "error_pct": 0.0,
+          "rps": 65.9,
+          "avg_ms": 128.9,
+          "p50_ms": 110.0,
+          "p95_ms": 230.0,
+          "p99_ms": 640.0,
+          "max_ms": 899.3553000036627
+        },
+        {
+          "name": "Aggregated",
+          "requests": 2138,
+          "failures": 0,
+          "error_pct": 0.0,
+          "rps": 132.2,
+          "avg_ms": 150.5,
+          "p50_ms": 120.0,
+          "p95_ms": 290.0,
+          "p99_ms": 710.0,
+          "max_ms": 1452.68450002186
+        }
+      ]
+    }
+  ],
+  "mixed": {
+    "users": 20,
+    "duration_s": 30,
+    "rows": [
+      {
+        "name": "GET /api/analytics/breakdown/categories",
+        "requests": 22,
+        "failures": 0,
+        "error_pct": 0.0,
+        "rps": 0.7,
+        "avg_ms": 486.2,
+        "p50_ms": 370.0,
+        "p95_ms": 1200.0,
+        "p99_ms": 2200.0,
+        "max_ms": 2155.290300026536
+      },
+      {
+        "name": "GET /api/analytics/breakdown/tags",
+        "requests": 6,
+        "failures": 0,
+        "error_pct": 0.0,
+        "rps": 0.2,
+        "avg_ms": 314.8,
+        "p50_ms": 310.0,
+        "p95_ms": 760.0,
+        "p99_ms": 760.0,
+        "max_ms": 758.7275999831036
+      },
+      {
+        "name": "GET /api/analytics/budgets/{id}",
+        "requests": 11,
+        "failures": 0,
+        "error_pct": 0.0,
+        "rps": 0.4,
+        "avg_ms": 680.0,
+        "p50_ms": 520.0,
+        "p95_ms": 1900.0,
+        "p99_ms": 1900.0,
+        "max_ms": 1875.7019999902695
+      },
+      {
+        "name": "GET /api/analytics/comparison/period",
+        "requests": 25,
+        "failures": 0,
+        "error_pct": 0.0,
+        "rps": 0.8,
+        "avg_ms": 684.9,
+        "p50_ms": 220.0,
+        "p95_ms": 2500.0,
+        "p99_ms": 2800.0,
+        "max_ms": 2805.252499994822
+      },
+      {
+        "name": "GET /api/analytics/overview",
+        "requests": 46,
+        "failures": 0,
+        "error_pct": 0.0,
+        "rps": 1.5,
+        "avg_ms": 770.9,
+        "p50_ms": 400.0,
+        "p95_ms": 2500.0,
+        "p99_ms": 2700.0,
+        "max_ms": 2657.4636000441387
+      },
+      {
+        "name": "GET /api/analytics/safe-to-spend",
+        "requests": 33,
+        "failures": 0,
+        "error_pct": 0.0,
+        "rps": 1.1,
+        "avg_ms": 866.4,
+        "p50_ms": 560.0,
+        "p95_ms": 2400.0,
+        "p99_ms": 2600.0,
+        "max_ms": 2586.5371000254527
+      },
+      {
+        "name": "GET /api/analytics/trends/monthly",
+        "requests": 23,
+        "failures": 0,
+        "error_pct": 0.0,
+        "rps": 0.7,
+        "avg_ms": 699.0,
+        "p50_ms": 350.0,
+        "p95_ms": 2100.0,
+        "p99_ms": 4200.0,
+        "max_ms": 4201.910299947485
+      },
+      {
+        "name": "GET /api/analytics/trends/yearly",
+        "requests": 8,
+        "failures": 0,
+        "error_pct": 0.0,
+        "rps": 0.3,
+        "avg_ms": 538.9,
+        "p50_ms": 380.0,
+        "p95_ms": 1500.0,
+        "p99_ms": 1500.0,
+        "max_ms": 1451.1059999931604
+      },
+      {
+        "name": "GET /api/budgets",
+        "requests": 15,
+        "failures": 0,
+        "error_pct": 0.0,
+        "rps": 0.5,
+        "avg_ms": 381.2,
+        "p50_ms": 230.0,
+        "p95_ms": 1100.0,
+        "p99_ms": 1100.0,
+        "max_ms": 1143.2351999683306
+      },
+      {
+        "name": "POST /api/budgets",
+        "requests": 7,
+        "failures": 0,
+        "error_pct": 0.0,
+        "rps": 0.2,
+        "avg_ms": 1145.2,
+        "p50_ms": 350.0,
+        "p95_ms": 3800.0,
+        "p99_ms": 3800.0,
+        "max_ms": 3818.1663000723347
+      },
+      {
+        "name": "DELETE /api/budgets/{id}",
+        "requests": 7,
+        "failures": 0,
+        "error_pct": 0.0,
+        "rps": 0.2,
+        "avg_ms": 901.2,
+        "p50_ms": 1000.0,
+        "p95_ms": 1600.0,
+        "p99_ms": 1600.0,
+        "max_ms": 1625.9412000654265
+      },
+      {
+        "name": "GET /api/calendar/recurring.ics",
+        "requests": 6,
+        "failures": 0,
+        "error_pct": 0.0,
+        "rps": 0.2,
+        "avg_ms": 687.2,
+        "p50_ms": 400.0,
+        "p95_ms": 2100.0,
+        "p99_ms": 2100.0,
+        "max_ms": 2144.5551000069827
+      },
+      {
+        "name": "GET /api/currencies",
+        "requests": 12,
+        "failures": 0,
+        "error_pct": 0.0,
+        "rps": 0.4,
+        "avg_ms": 398.5,
+        "p50_ms": 330.0,
+        "p95_ms": 1200.0,
+        "p99_ms": 1200.0,
+        "max_ms": 1150.3866000566632
+      },
+      {
+        "name": "GET /api/exports/reports/recurring",
+        "requests": 11,
+        "failures": 0,
+        "error_pct": 0.0,
+        "rps": 0.4,
+        "avg_ms": 632.7,
+        "p50_ms": 350.0,
+        "p95_ms": 2100.0,
+        "p99_ms": 2100.0,
+        "max_ms": 2144.9015999678522
+      },
+      {
+        "name": "GET /api/exports/transactions.csv",
+        "requests": 8,
+        "failures": 0,
+        "error_pct": 0.0,
+        "rps": 0.3,
+        "avg_ms": 767.1,
+        "p50_ms": 1100.0,
+        "p95_ms": 1300.0,
+        "p99_ms": 1300.0,
+        "max_ms": 1296.5257000178099
+      },
+      {
+        "name": "GET /api/goals",
+        "requests": 23,
+        "failures": 0,
+        "error_pct": 0.0,
+        "rps": 0.7,
+        "avg_ms": 265.9,
+        "p50_ms": 140.0,
+        "p95_ms": 1100.0,
+        "p99_ms": 1300.0,
+        "max_ms": 1266.2896999390796
+      },
+      {
+        "name": "POST /api/goals",
+        "requests": 8,
+        "failures": 0,
+        "error_pct": 0.0,
+        "rps": 0.3,
+        "avg_ms": 707.5,
+        "p50_ms": 600.0,
+        "p95_ms": 1300.0,
+        "p99_ms": 1300.0,
+        "max_ms": 1338.4045000420883
+      },
+      {
+        "name": "DELETE /api/goals/{id}",
+        "requests": 8,
+        "failures": 0,
+        "error_pct": 0.0,
+        "rps": 0.3,
+        "avg_ms": 954.1,
+        "p50_ms": 1100.0,
+        "p95_ms": 1800.0,
+        "p99_ms": 1800.0,
+        "max_ms": 1815.504200058058
+      },
+      {
+        "name": "POST /api/goals/{id}/deposit",
+        "requests": 13,
+        "failures": 0,
+        "error_pct": 0.0,
+        "rps": 0.4,
+        "avg_ms": 908.2,
+        "p50_ms": 1000.0,
+        "p95_ms": 2100.0,
+        "p99_ms": 2100.0,
+        "max_ms": 2095.436800038442
+      },
+      {
+        "name": "POST /api/goals/{id}/withdraw",
+        "requests": 13,
+        "failures": 0,
+        "error_pct": 0.0,
+        "rps": 0.4,
+        "avg_ms": 1055.3,
+        "p50_ms": 1100.0,
+        "p95_ms": 2500.0,
+        "p99_ms": 2500.0,
+        "max_ms": 2534.637000062503
+      },
+      {
+        "name": "GET /api/settings/notifications",
+        "requests": 8,
+        "failures": 0,
+        "error_pct": 0.0,
+        "rps": 0.3,
+        "avg_ms": 366.1,
+        "p50_ms": 260.0,
+        "p95_ms": 960.0,
+        "p99_ms": 960.0,
+        "max_ms": 958.5692000109702
+      },
+      {
+        "name": "GET /api/settings/profile",
+        "requests": 7,
+        "failures": 0,
+        "error_pct": 0.0,
+        "rps": 0.2,
+        "avg_ms": 523.2,
+        "p50_ms": 300.0,
+        "p95_ms": 1400.0,
+        "p99_ms": 1400.0,
+        "max_ms": 1376.0701999999583
+      },
+      {
+        "name": "GET /api/settings/subscription",
+        "requests": 6,
+        "failures": 0,
+        "error_pct": 0.0,
+        "rps": 0.2,
+        "avg_ms": 381.2,
+        "p50_ms": 270.0,
+        "p95_ms": 1400.0,
+        "p99_ms": 1400.0,
+        "max_ms": 1396.0793999722227
+      },
+      {
+        "name": "GET /api/templates",
+        "requests": 17,
+        "failures": 0,
+        "error_pct": 0.0,
+        "rps": 0.5,
+        "avg_ms": 481.0,
+        "p50_ms": 140.0,
+        "p95_ms": 1900.0,
+        "p99_ms": 1900.0,
+        "max_ms": 1903.9396999869496
+      },
+      {
+        "name": "POST /api/templates",
+        "requests": 10,
+        "failures": 0,
+        "error_pct": 0.0,
+        "rps": 0.3,
+        "avg_ms": 1104.1,
+        "p50_ms": 1200.0,
+        "p95_ms": 2400.0,
+        "p99_ms": 2400.0,
+        "max_ms": 2412.162800086662
+      },
+      {
+        "name": "GET /api/templates/suggestions",
+        "requests": 18,
+        "failures": 0,
+        "error_pct": 0.0,
+        "rps": 0.6,
+        "avg_ms": 682.5,
+        "p50_ms": 390.0,
+        "p95_ms": 2200.0,
+        "p99_ms": 2200.0,
+        "max_ms": 2168.2707000290975
+      },
+      {
+        "name": "DELETE /api/templates/{id}",
+        "requests": 10,
+        "failures": 0,
+        "error_pct": 0.0,
+        "rps": 0.3,
+        "avg_ms": 787.7,
+        "p50_ms": 250.0,
+        "p95_ms": 3300.0,
+        "p99_ms": 3300.0,
+        "max_ms": 3252.567399991676
+      },
+      {
+        "name": "POST /api/templates/{id}/use",
+        "requests": 25,
+        "failures": 0,
+        "error_pct": 0.0,
+        "rps": 0.8,
+        "avg_ms": 1192.9,
+        "p50_ms": 1000.0,
+        "p95_ms": 3000.0,
+        "p99_ms": 3700.0,
+        "max_ms": 3749.8268999624997
+      },
+      {
+        "name": "GET /api/transactions",
+        "requests": 83,
+        "failures": 0,
+        "error_pct": 0.0,
+        "rps": 2.7,
+        "avg_ms": 427.8,
+        "p50_ms": 190.0,
+        "p95_ms": 1300.0,
+        "p99_ms": 3400.0,
+        "max_ms": 3369.7650000685826
+      },
+      {
+        "name": "POST /api/transactions",
+        "requests": 24,
+        "failures": 0,
+        "error_pct": 0.0,
+        "rps": 0.8,
+        "avg_ms": 1162.8,
+        "p50_ms": 1200.0,
+        "p95_ms": 2700.0,
+        "p99_ms": 3300.0,
+        "max_ms": 3252.7295000618324
+      },
+      {
+        "name": "GET /api/transactions/categories/list",
+        "requests": 13,
+        "failures": 0,
+        "error_pct": 0.0,
+        "rps": 0.4,
+        "avg_ms": 52.8,
+        "p50_ms": 25.0,
+        "p95_ms": 250.0,
+        "p99_ms": 250.0,
+        "max_ms": 251.5391999622807
+      },
+      {
+        "name": "GET /api/transactions/recurring",
+        "requests": 15,
+        "failures": 0,
+        "error_pct": 0.0,
+        "rps": 0.5,
+        "avg_ms": 801.5,
+        "p50_ms": 380.0,
+        "p95_ms": 2700.0,
+        "p99_ms": 2700.0,
+        "max_ms": 2680.879899999127
+      },
+      {
+        "name": "POST /api/transactions/recurring",
+        "requests": 10,
+        "failures": 0,
+        "error_pct": 0.0,
+        "rps": 0.3,
+        "avg_ms": 1031.6,
+        "p50_ms": 1200.0,
+        "p95_ms": 2800.0,
+        "p99_ms": 2800.0,
+        "max_ms": 2752.9164999723434
+      },
+      {
+        "name": "DELETE /api/transactions/recurring/{id}",
+        "requests": 10,
+        "failures": 0,
+        "error_pct": 0.0,
+        "rps": 0.3,
+        "avg_ms": 413.5,
+        "p50_ms": 280.0,
+        "p95_ms": 1300.0,
+        "p99_ms": 1300.0,
+        "max_ms": 1252.112599904649
+      },
+      {
+        "name": "GET /api/transactions/search?filters",
+        "requests": 21,
+        "failures": 0,
+        "error_pct": 0.0,
+        "rps": 0.7,
+        "avg_ms": 564.7,
+        "p50_ms": 240.0,
+        "p95_ms": 1500.0,
+        "p99_ms": 1500.0,
+        "max_ms": 1535.772699979134
+      },
+      {
+        "name": "GET /api/transactions/search?q",
+        "requests": 41,
+        "failures": 0,
+        "error_pct": 0.0,
+        "rps": 1.3,
+        "avg_ms": 1573.0,
+        "p50_ms": 1400.0,
+        "p95_ms": 2400.0,
+        "p99_ms": 3000.0,
+        "max_ms": 3007.776999962516
+      },
+      {
+        "name": "GET /api/transactions/trash",
+        "requests": 8,
+        "failures": 0,
+        "error_pct": 0.0,
+        "rps": 0.3,
+        "avg_ms": 1031.0,
+        "p50_ms": 610.0,
+        "p95_ms": 3800.0,
+        "p99_ms": 3800.0,
+        "max_ms": 3795.785399968736
+      },
+      {
+        "name": "DELETE /api/transactions/trash/{id}",
+        "requests": 48,
+        "failures": 0,
+        "error_pct": 0.0,
+        "rps": 1.5,
+        "avg_ms": 628.7,
+        "p50_ms": 300.0,
+        "p95_ms": 1200.0,
+        "p99_ms": 4900.0,
+        "max_ms": 4930.573200108483
+      },
+      {
+        "name": "DELETE /api/transactions/{id}",
+        "requests": 48,
+        "failures": 0,
+        "error_pct": 0.0,
+        "rps": 1.5,
+        "avg_ms": 1188.5,
+        "p50_ms": 1200.0,
+        "p95_ms": 3300.0,
+        "p99_ms": 3900.0,
+        "max_ms": 3876.4036999782547
+      },
+      {
+        "name": "GET /api/transactions/{id}",
+        "requests": 31,
+        "failures": 0,
+        "error_pct": 0.0,
+        "rps": 1.0,
+        "avg_ms": 491.4,
+        "p50_ms": 150.0,
+        "p95_ms": 2100.0,
+        "p99_ms": 3300.0,
+        "max_ms": 3273.230299935676
+      },
+      {
+        "name": "PATCH /api/transactions/{id}",
+        "requests": 23,
+        "failures": 0,
+        "error_pct": 0.0,
+        "rps": 0.7,
+        "avg_ms": 965.9,
+        "p50_ms": 770.0,
+        "p95_ms": 2600.0,
+        "p99_ms": 2800.0,
+        "max_ms": 2842.5860999850556
+      },
+      {
+        "name": "GET /api/transactions?kind&category&date_from",
+        "requests": 29,
+        "failures": 0,
+        "error_pct": 0.0,
+        "rps": 0.9,
+        "avg_ms": 453.3,
+        "p50_ms": 170.0,
+        "p95_ms": 1300.0,
+        "p99_ms": 2500.0,
+        "max_ms": 2515.409499988891
+      },
+      {
+        "name": "GET /api/users/me",
+        "requests": 22,
+        "failures": 0,
+        "error_pct": 0.0,
+        "rps": 0.7,
+        "avg_ms": 274.1,
+        "p50_ms": 160.0,
+        "p95_ms": 960.0,
+        "p99_ms": 1200.0,
+        "max_ms": 1197.9285000124946
+      },
+      {
+        "name": "GET /health/",
+        "requests": 18,
+        "failures": 0,
+        "error_pct": 0.0,
+        "rps": 0.6,
+        "avg_ms": 190.3,
+        "p50_ms": 72.0,
+        "p95_ms": 910.0,
+        "p99_ms": 910.0,
+        "max_ms": 909.1778000583872
+      },
+      {
+        "name": "Aggregated",
+        "requests": 850,
+        "failures": 0,
+        "error_pct": 0.0,
+        "rps": 27.3,
+        "avg_ms": 716.6,
+        "p50_ms": 360.0,
+        "p95_ms": 2200.0,
+        "p99_ms": 3300.0,
+        "max_ms": 4930.573200108483
+      }
+    ]
+  },
+  "max_rps": []
+}

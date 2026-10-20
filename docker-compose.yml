@@ -35,7 +35,13 @@ services:
       DB_HOST: db
       DB_PORT: 5432
       DB_NAME: ${DB_NAME:-financialdb}
+      APP_ENV: ${APP_ENV:-development}
       SECRET_KEY: ${SECRET_KEY:-change-me-in-production}
+      SESSION_SECRET: ${SESSION_SECRET:-}
+      # Behind the frontend's nginx: client IPs for the security history come from X-Forwarded-For
+      TRUST_PROXY_HEADERS: "true"
+      # Passkeys are bound to this domain (no port); set it to your real domain in production
+      WEBAUTHN_RP_ID: ${WEBAUTHN_RP_ID:-localhost}
       ALGORITHM: HS256
       ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-120}
       REFRESH_TOKEN_EXPIRE_DAYS: ${REFRESH_TOKEN_EXPIRE_DAYS:-30}

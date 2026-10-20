@@ -1,5 +1,6 @@
 # import os
 # import sys
+import sys
 import time
 
 import uvicorn
@@ -24,12 +25,19 @@ from src.two_fa.two_fa_router import two_fa_router
 from src.budgets.budget_router import budget_router
 from src.transactions.recurring_router import recurring_router, register_recurring_cron
 from src.transactions.import_router import import_router
+from src.transactions.trash_router import trash_router, register_trash_cron
 from src.analytics.analytics_router import analytics_router
 from src.settings.settings_router import settings_router
 from src.files.file_router import file_router
+from src.templates.template_router import template_router
+from src.calendar_export.calendar_router import calendar_router
+from src.exports.export_router import export_router
+from src.security.security_router import security_router
+from src.security.passkey_router import passkey_router
 
 from src.database import get_db
-from src.config import origins
+from src.config import IS_PRODUCTION, SESSION_SECRET, logger, origins
+from src.files.services import ocr_service
 
 app = FastAPI(title="Financial API")
 
@@ -42,6 +50,18 @@ app.add_middleware(
 )
 register_currency_cron(app)
 register_recurring_cron(app)
+register_trash_cron(app)
+
+
+@app.on_event("startup")
+def log_ocr_capabilities():
+    # Receipt OCR silently degrades without OpenCV / Tesseract — make it visible.
+    caps = ocr_service.capabilities()
+    logger.info("Receipt OCR capabilities: %s (python: %s)", caps, sys.executable)
+    for warning in ocr_service.capability_warnings(caps):
+        logger.warning("Receipt OCR degraded — %s. Fix: %s -m pip install -r requirements.txt",
+                       warning, sys.executable)
+
 
 @app.middleware("http")
 async def add_process_time_header(request: Request, call_next):
@@ -51,15 +71,20 @@ async def add_process_time_header(request: Request, call_next):
     response.headers["X-Process-Time"] = str(process_time)
     return response
 
-app.add_middleware(SessionMiddleware, secret_key="super-session-secret")
+app.add_middleware(SessionMiddleware, secret_key=SESSION_SECRET)
 
 app.include_router(health_router, prefix="/health", tags=["Health Check"])
 app.include_router(auth_router, prefix="/api/auth", tags=["Auth"])
+app.include_router(passkey_router, prefix="/api/passkeys", tags=["Passkeys"])
+app.include_router(security_router, prefix="/api/security", tags=["Security"])
 # Sub-routers first: otherwise GET /api/transactions/{tx_id} swallows "/recurring"
 app.include_router(recurring_router, prefix="/api/transactions/recurring", tags=["Recurring Transactions"])
 app.include_router(import_router, prefix="/api/transactions/import", tags=["Import"])
+app.include_router(trash_router, prefix="/api/transactions/trash", tags=["Trash"])
 app.include_router(transaction_router, prefix="/api/transactions", tags=["Transactions"])
-app.include_router(dev_router, prefix="/api/dev")
+# Unauthenticated seeding — local development only
+if not IS_PRODUCTION:
+    app.include_router(dev_router, prefix="/api/dev")
 app.include_router(users_router, prefix="/api/users", tags=["Users"])
 app.include_router(currency_router, prefix="/api/currencies", tags=["Currencies"])
 app.include_router(google_oauth_router, prefix="/api", tags=["Google OAuth"])
@@ -70,6 +95,9 @@ app.include_router(budget_router, prefix="/api/budgets", tags=["Budgets"])
 app.include_router(analytics_router, prefix="/api/analytics", tags=["Analytics"])
 app.include_router(settings_router, prefix="/api/settings", tags=["Settings"])
 app.include_router(file_router, prefix="/api/files", tags=["Files"])
+app.include_router(template_router, prefix="/api/templates", tags=["Transaction Templates"])
+app.include_router(calendar_router, prefix="/api/calendar", tags=["Calendar Export"])
+app.include_router(export_router, prefix="/api/exports", tags=["Exports"])
 
 if __name__ == '__main__':
     get_db()

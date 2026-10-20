@@ -1,5 +1,7 @@
 from fastapi import Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer
+from typing import Optional
+
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from datetime import datetime, timezone
@@ -8,15 +10,26 @@ from src.database import get_db
 from src.models import User
 from src.utils.security import decode_token
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
+# Plain bearer scheme: Swagger's "Authorize" shows a single box for the access
+# token returned by POST /api/auth/login (which takes JSON, not an OAuth2 form).
+# auto_error=False so a missing token is a 401 (HTTPBearer's default is 403).
+oauth2_scheme = HTTPBearer(bearerFormat="JWT", auto_error=False)
 
 # Token types that are NOT valid for regular API access
 _BLOCKED_TOKEN_TYPES = {"refresh", "2fa_pending"}
 
 
-async def get_current_user_id_from_token(token: str = Depends(oauth2_scheme)) -> int:
+async def get_current_user_id_from_token(
+        credentials: Optional[HTTPAuthorizationCredentials] = Depends(oauth2_scheme),
+) -> int:
+    if credentials is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
     try:
-        payload = decode_token(token)
+        payload = decode_token(credentials.credentials)
         token_type = payload.get("type")
         # Allow tokens without 'type' for backward compatibility
         if token_type in _BLOCKED_TOKEN_TYPES:

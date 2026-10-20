@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
-import { User, Bell, Lock, CreditCard, Palette, Globe, Check, X, Monitor, ShieldCheck } from 'lucide-react';
+import { User, Bell, Lock, CreditCard, Palette, Globe, Check, X, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
 import { motion } from 'motion/react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
@@ -22,6 +22,10 @@ import { errorMessage } from '../lib/errors';
 import { AsyncBlock, ComingSoonBadge } from '../components/common/States';
 import { ConfirmDialog } from '../components/common/ConfirmDialog';
 import { CURRENCIES, type NotificationPreferences, type TwoFASetup } from '../types/api';
+import { PasswordStrengthMeter } from '../components/security/PasswordStrengthMeter';
+import { PasswordHealthCard } from '../components/security/PasswordHealthCard';
+import { PasskeysCard } from '../components/security/PasskeysCard';
+import { ActivityCard } from '../components/security/ActivityCard';
 
 type Tab = 'profile' | 'notifications' | 'security' | 'subscription' | 'preferences';
 const TABS: Tab[] = ['profile', 'notifications', 'security', 'subscription', 'preferences'];
@@ -368,6 +372,7 @@ function SecurityTab() {
       setCurrent('');
       setNext('');
       setConfirm('');
+      notifyDataChanged();   // password health card
     } catch (err) {
       toast.error(errorMessage(err, t));
     } finally {
@@ -424,6 +429,8 @@ function SecurityTab() {
 
   return (
     <div className="space-y-6">
+      <PasswordHealthCard />
+
       <Card className="border-0 shadow-sm">
         <CardHeader>
           <CardTitle>{t.settings.security.password}</CardTitle>
@@ -437,7 +444,7 @@ function SecurityTab() {
             <div className="space-y-2">
               <Label htmlFor="new-password">{t.settings.security.newPassword}</Label>
               <Input id="new-password" type="password" autoComplete="new-password" value={next} onChange={(e) => setNext(e.target.value)} />
-              <p className="text-xs text-gray-500">{t.auth.passwordRequirements}</p>
+              <PasswordStrengthMeter password={next} username={user?.username} email={user?.email} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="confirm-password">{t.settings.security.confirmPassword}</Label>
@@ -478,26 +485,9 @@ function SecurityTab() {
         </CardContent>
       </Card>
 
-      <Card className="border-0 shadow-sm">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            {t.settings.security.activeSessions} <ComingSoonBadge />
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <div className="flex items-center justify-between p-3 rounded-lg bg-gray-50">
-            <div className="flex items-center gap-3">
-              <Monitor className="w-5 h-5 text-gray-500" />
-              <div>
-                <h4 className="font-medium text-gray-900">{t.settings.security.currentSession}</h4>
-                <p className="text-sm text-gray-500 mt-1 max-w-md truncate">{navigator.userAgent}</p>
-              </div>
-            </div>
-            <Badge>{t.settings.security.active}</Badge>
-          </div>
-          <p className="text-xs text-gray-500">{t.settings.security.otherSessionsHint}</p>
-        </CardContent>
-      </Card>
+      <PasskeysCard />
+
+      <ActivityCard />
 
       {/* Enable 2FA: scan QR, confirm with a code */}
       <Dialog open={Boolean(setup)} onOpenChange={(open) => !open && setSetup(null)}>

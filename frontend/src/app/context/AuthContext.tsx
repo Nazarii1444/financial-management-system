@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, ReactNode } from 'react';
-import { ApiError, authApi, SESSION_EXPIRED_EVENT, tokenStore, usersApi } from '../lib/api';
+import { ApiError, authApi, passkeysApi, SESSION_EXPIRED_EVENT, tokenStore, usersApi } from '../lib/api';
+import { getPasskey } from '../lib/webauthn';
 import type { UserOut } from '../types/api';
 
 type AuthStatus = 'loading' | 'authenticated' | 'anonymous';
@@ -12,6 +13,8 @@ interface AuthContextType {
   user: UserOut | null;
   login: (email: string, password: string, remember: boolean) => Promise<LoginResult>;
   complete2fa: (tempToken: string, code: string, remember: boolean) => Promise<void>;
+  /** Passwordless sign-in: the browser shows the passkeys it has for this site */
+  loginWithPasskey: (remember: boolean) => Promise<void>;
   register: (username: string, email: string, password: string) => Promise<void>;
   /** Store tokens obtained elsewhere (OAuth redirect) and load the user */
   acceptTokens: (access: string, refresh: string) => Promise<void>;
@@ -74,6 +77,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [loadUser],
   );
 
+  const loginWithPasskey = useCallback<AuthContextType['loginWithPasskey']>(
+    async (remember) => {
+      const options = await passkeysApi.loginOptions();
+      const credential = await getPasskey(options.public_key);
+      const pair = await passkeysApi.login(options.challenge_id, credential);
+      tokenStore.set({ access: pair.access_token, refresh: pair.refresh_token }, remember);
+      await loadUser();
+    },
+    [loadUser],
+  );
+
   const register = useCallback<AuthContextType['register']>(
     async (username, email, password) => {
       const res = await authApi.signup(username.trim(), email.trim().toLowerCase(), password);
@@ -109,13 +123,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user,
       login,
       complete2fa,
+      loginWithPasskey,
       register,
       acceptTokens,
       logout,
       refreshUser: loadUser,
       setUser: setUserState,
     }),
-    [status, user, login, complete2fa, register, acceptTokens, logout, loadUser],
+    [status, user, login, complete2fa, loginWithPasskey, register, acceptTokens, logout, loadUser],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

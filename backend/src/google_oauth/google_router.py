@@ -14,7 +14,8 @@ from src.config import (
 )
 from src.database import get_db
 from src.utils.getters_services import get_user_by_email
-from src.auth.auth_services import create_user
+from src.auth.auth_services import create_user, oauth_placeholder_password
+from src.security.events import EventType, record_event
 from src.auth.schemas import UserCreate
 from src.utils.jwt_handlers import create_access_token, create_refresh_token
 
@@ -84,10 +85,12 @@ async def google_callback(
             UserCreate(
                 username=username,
                 email=email,
-                password="__google_oauth__",
+                password=oauth_placeholder_password(),
             ),
+            oauth=True,
         )
 
+    await record_event(db, user.id_, EventType.LOGIN, request, method="google")
     access_token = await create_access_token({"sub": str(user.id_), "username": username})
     refresh_token = await create_refresh_token({"sub": str(user.id_)})
 

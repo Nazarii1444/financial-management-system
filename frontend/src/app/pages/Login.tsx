@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Eye, EyeOff, Mail, Lock } from 'lucide-react';
+import { Eye, EyeOff, Fingerprint, Mail, Lock } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -11,6 +11,8 @@ import { useLanguage } from '../i18n/LanguageContext';
 import { motion } from 'motion/react';
 import { ApiError, oauthLoginUrl } from '../lib/api';
 import { errorMessage } from '../lib/errors';
+import { PasskeyCancelled, passkeysSupported } from '../lib/webauthn';
+import { passkeyErrorMessage } from '../components/security/PasskeysCard';
 
 // User created by backend/scripts/seed.py — shown only in local development
 const DEMO_CREDENTIALS = {
@@ -27,7 +29,7 @@ export function Login() {
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
-  const { login } = useAuth();
+  const { login, loginWithPasskey } = useAuth();
   const { t, language, setLanguage } = useLanguage();
 
   const validateEmail = (email: string): boolean => {
@@ -50,6 +52,19 @@ export function Login() {
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
+  };
+
+  const handlePasskey = async () => {
+    setIsLoading(true);
+    try {
+      await loginWithPasskey(remember);
+      toast.success(t.auth.loginSuccess);
+      navigate((location.state as { from?: string } | null)?.from || '/', { replace: true });
+    } catch (err) {
+      if (!(err instanceof PasskeyCancelled)) toast.error(`${t.security.passkeySignInFailed}: ${passkeyErrorMessage(err, t)}`);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -336,6 +351,12 @@ export function Login() {
                   {t.auth.github}
                 </Button>
               </div>
+              {passkeysSupported() && (
+                <Button type="button" variant="outline" className="w-full mt-3" disabled={isLoading} onClick={handlePasskey}>
+                  <Fingerprint className="w-5 h-5 mr-2" />
+                  {t.security.signInWithPasskey}
+                </Button>
+              )}
             </form>
 
             <p className="text-center text-sm text-gray-600 mt-6">

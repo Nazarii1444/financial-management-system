@@ -21,6 +21,10 @@ class BaseStorageService(ABC):
         """
 
     @abstractmethod
+    async def read(self, file_path: str) -> bytes:
+        """Return the bytes stored at the given relative path. Raises FileNotFoundError."""
+
+    @abstractmethod
     async def delete(self, file_path: str) -> None:
         """Remove file at the given relative path. Silently ignore missing files."""
 
@@ -48,6 +52,10 @@ class LocalStorageService(BaseStorageService):
             await fh.write(data)
 
         return stored_filename, rel_path
+
+    async def read(self, file_path: str) -> bytes:
+        async with aiofiles.open(self.absolute_path(file_path), "rb") as fh:
+            return await fh.read()
 
     async def delete(self, file_path: str) -> None:
         abs_path = os.path.join(self.base_dir, file_path)

@@ -1,0 +1,80 @@
+{
+  "meta": {
+    "started_at": "2026-10-18T18:45:25",
+    "git_sha": "94b8259",
+    "git_dirty": true,
+    "host": "http://127.0.0.1:8002",
+    "users": 20,
+    "spawn_rate": 20,
+    "duration_s": 15,
+    "warmup_s": 10,
+    "wait_s": 0.0,
+    "machine": "Windows 10, 8 CPU, Python 3.11.9",
+    "label": "search_after",
+    "elapsed_s": 49
+  },
+  "endpoints": [
+    {
+      "endpoint": "tx_search_text",
+      "group": "read",
+      "rows": [
+        {
+          "name": "GET /api/transactions/search?q",
+          "requests": 505,
+          "failures": 0,
+          "error_pct": 0.0,
+          "rps": 31.8,
+          "avg_ms": 615.4,
+          "p50_ms": 570.0,
+          "p95_ms": 820.0,
+          "p99_ms": 950.0,
+          "max_ms": 1921.6785000171512
+        },
+        {
+          "name": "Aggregated",
+          "requests": 505,
+          "failures": 0,
+          "error_pct": 0.0,
+          "rps": 31.8,
+          "avg_ms": 615.4,
+          "p50_ms": 570.0,
+          "p95_ms": 820.0,
+          "p99_ms": 950.0,
+          "max_ms": 1921.6785000171512
+        }
+      ]
+    },
+    {
+      "endpoint": "tx_search_filtered",
+      "group": "read",
+      "rows": [
+        {
+          "name": "GET /api/transactions/search?filters",
+          "requests": 4043,
+          "failures": 0,
+          "error_pct": 0.0,
+          "rps": 254.1,
+          "avg_ms": 77.8,
+          "p50_ms": 83.0,
+          "p95_ms": 160.0,
+          "p99_ms": 170.0,
+          "max_ms": 295.8834000164643
+        },
+        {
+          "name": "Aggregated",
+          "requests": 4043,
+          "failures": 0,
+          "error_pct": 0.0,
+          "rps": 254.1,
+          "avg_ms": 77.8,
+          "p50_ms": 83.0,
+          "p95_ms": 160.0,
+          "p99_ms": 170.0,
+          "max_ms": 295.8834000164643
+        }
+      ]
+    }
+  ],
+  "mixed": null,
+  "max_rps": []
+}

@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, CheckConstraint, Numeric, String, ForeignKey, Float, Boolean, Enum, UniqueConstraint, DateTime, JSON, Text
+from sqlalchemy import Column, Integer, CheckConstraint, Numeric, String, ForeignKey, Float, Boolean, Enum, UniqueConstraint, DateTime, JSON, Text, Index, LargeBinary, SmallInteger
 from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -73,6 +73,15 @@ class User(Base):
     avatar_url = Column(String(512), nullable=True)
     subscription_plan = Column(Enum(SubscriptionPlan), nullable=False, default=SubscriptionPlan.FREE)
 
+    # Password health (src/security/password_policy.py). The plaintext is only seen at
+    # signup / change / login, so these are snapshots taken at those moments.
+    password_changed_at = Column(DateTime(timezone=True), nullable=True)   # NULL: set before this was tracked
+    password_score = Column(SmallInteger, nullable=True)                   # zxcvbn 0..4
+    password_breached = Column(Boolean, nullable=True)                     # NULL: never checked / HIBP unreachable
+    password_checked_at = Column(DateTime(timezone=True), nullable=True)   # last HIBP check
+    # Random WebAuthn user handle (never the numeric id) — set on the first passkey
+    webauthn_user_handle = Column(LargeBinary(64), nullable=True, unique=True)
+
     # relationships
     transactions = relationship("Transaction", back_populates="user", cascade="all, delete-orphan")
     goals = relationship("Goal", back_populates="user", cascade="all, delete-orphan")
@@ -82,6 +91,9 @@ class User(Base):
     recurring_transactions = relationship("RecurringTransaction", back_populates="user", cascade="all, delete-orphan")
     notification_preferences = relationship("NotificationPreferences", back_populates="user", uselist=False, cascade="all, delete-orphan")
     receipts = relationship("Receipt", back_populates="user", cascade="all, delete-orphan")
+    transaction_templates = relationship("TransactionTemplate", back_populates="user", cascade="all, delete-orphan")
+    security_events = relationship("SecurityEvent", back_populates="user", cascade="all, delete-orphan", passive_deletes=True)
+    passkeys = relationship("WebAuthnCredential", back_populates="user", cascade="all, delete-orphan", passive_deletes=True)
 
     __table_args__ = (
         CheckConstraint(
@@ -100,8 +112,10 @@ class Currency(Base):
 
 class Transaction(Base):
     __tablename__ = "transactions"
+    # Every per-user read (list, search, analytics, export) filters by user and usually a date range
+    __table_args__ = (Index("ix_transactions_user_id_date", "user_id", "date"),)
 
-    id_ = Column(Integer, primary_key=True, autoincrement=True, index=True)
+    id_ = Column(Integer, primary_key=True, autoincrement=True)  # the primary key is already indexed
     user_id = Column(Integer, ForeignKey("users.id_", ondelete="CASCADE"), nullable=False)
     amount = Column(Numeric(14, 2), nullable=False)
     name = Column(String(64), nullable=False, default="")
@@ -111,6 +125,11 @@ class Transaction(Base):
     tags = Column(ARRAY(String), nullable=False, server_default='{}')
     note = Column(String(512), nullable=True)
     date = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    # Bank-statement import: stable fingerprint of the source row (dedupe on re-import)
+    import_ref = Column(String(64), nullable=True, index=True)
+    # False for history imported without touching the balance — delete / edit /
+    # restore must then leave User.capital alone too.
+    counts_in_balance = Column(Boolean, nullable=False, default=True, server_default="true")
 
     user = relationship("User", back_populates="transactions")
     receipts = relationship("Receipt", back_populates="transaction")
@@ -249,5 +268,150 @@ class Receipt(Base):
     transaction = relationship("Transaction", back_populates="receipts")
 
 
+class TransactionTemplate(Base):
+    """
+    Saved transaction preset ("morning coffee") used with one click from the
+    dashboard. Unlike RecurringTransaction nothing fires automatically — a
+    Transaction is created only on `POST /api/templates/{id}/use`.
+    """
+    __tablename__ = "transaction_templates"
+
+    id_ = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id_", ondelete="CASCADE"), nullable=False, index=True)
+    name = Column(String(64), nullable=False)
+    amount = Column(Numeric(14, 2), nullable=False)
+    kind = Column(Enum(TransactionKind), nullable=False, default=TransactionKind.EXPENSE)
+    category_name = Column(String(64), nullable=False)
+    currency = Column(String(16), nullable=False)
+    tags = Column(ARRAY(String), nullable=False, server_default='{}')
+    note = Column(String(512), nullable=True)
+    use_count = Column(Integer, nullable=False, default=0, server_default="0")
+    last_used_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    user = relationship("User", back_populates="transaction_templates")
 
 
+class TemplateSuggestionDismissal(Base):
+    """A template suggestion the user rejected; `key` is the suggestion's similarity key."""
+    __tablename__ = "template_suggestion_dismissals"
+
+    id_ = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id_", ondelete="CASCADE"), nullable=False, index=True)
+    key = Column(String(255), nullable=False)
+    dismissed_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "key", name="uq_template_dismissal_user_key"),
+    )
+
+
+class CalendarFeed(Base):
+    """
+    Secret subscription URL for the user's recurring payments as iCalendar
+    (`GET /api/calendar/feed/{token}.ics`, no auth header — calendar apps
+    can't send one). Rotating the token invalidates old subscriptions.
+    """
+    __tablename__ = "calendar_feeds"
+
+    id_ = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id_", ondelete="CASCADE"), nullable=False, unique=True)
+    token = Column(String(64), nullable=False, unique=True, index=True)
+    lang = Column(String(8), nullable=False, default="uk")
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class GoogleCalendarLink(Base):
+    """
+    Google Calendar API connection: recurring rules are pushed as events into a
+    dedicated calendar created by the app (scope `calendar.app.created`).
+    Tokens are encrypted with a key derived from SECRET_KEY.
+    """
+    __tablename__ = "google_calendar_links"
+
+    id_ = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id_", ondelete="CASCADE"), nullable=False, unique=True)
+    refresh_token = Column(Text, nullable=False)      # encrypted
+    access_token = Column(Text, nullable=True)        # encrypted
+    token_expires_at = Column(DateTime(timezone=True), nullable=True)
+    calendar_id = Column(String(255), nullable=True)
+    lang = Column(String(8), nullable=False, default="uk")
+    last_synced_at = Column(DateTime(timezone=True), nullable=True)
+    last_error = Column(String(512), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class TransactionTrash(Base):
+    """
+    Soft-deleted transaction (the "trash"). The Transaction row itself is
+    removed, so analytics/budgets/search need no `deleted_at` filters; the
+    snapshot here is enough to re-insert it with the same `id_`.
+
+    `capital_effect` is the exact signed amount the transaction contributed to
+    `User.capital` (in `capital_currency`) at deletion time — restoring adds it
+    back verbatim, so the balance returns exactly even if FX rates moved.
+    Rows are purged after `expires_at` (30 days).
+    """
+    __tablename__ = "transaction_trash"
+
+    id_ = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id_", ondelete="CASCADE"), nullable=False, index=True)
+    transaction_id = Column(Integer, nullable=False)          # original Transaction.id_
+    data = Column(JSON, nullable=False)                       # name, amount, kind, category_name, currency, tags, note, date
+    receipt_ids = Column(JSON, nullable=False, default=list)  # receipts to re-link on restore
+    capital_effect = Column(Numeric(14, 2), nullable=False)
+    capital_currency = Column(String(3), nullable=False)
+    deleted_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    expires_at = Column(DateTime(timezone=True), nullable=False, index=True)
+
+
+class SecurityEvent(Base):
+    """
+    Login / security activity shown to the user (SEC-S1): sign-ins (password,
+    2FA, passkey, OAuth), failed attempts on an existing account and sensitive
+    changes. Written by `src/security/events.py::record_event`.
+    """
+    __tablename__ = "security_events"
+    __table_args__ = (Index("ix_security_events_user_id_created_at", "user_id", "created_at"),)
+
+    id_ = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id_", ondelete="CASCADE"), nullable=False)
+    event_type = Column(String(32), nullable=False)          # see events.EventType
+    success = Column(Boolean, nullable=False, default=True)
+    method = Column(String(16), nullable=True)               # password | totp | passkey | google | github
+    ip = Column(String(45), nullable=True)                   # IPv6 max length
+    user_agent = Column(String(512), nullable=True)
+    details = Column(JSON, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    user = relationship("User", back_populates="security_events")
+
+
+class WebAuthnCredential(Base):
+    """A registered passkey (SEC-A1). Only the public key is stored."""
+    __tablename__ = "webauthn_credentials"
+
+    id_ = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id_", ondelete="CASCADE"), nullable=False, index=True)
+    credential_id = Column(LargeBinary, nullable=False, unique=True)
+    public_key = Column(LargeBinary, nullable=False)            # COSE key
+    sign_count = Column(Integer, nullable=False, default=0)
+    transports = Column(JSON, nullable=True)                    # ["internal", "hybrid", ...] — hints for the browser
+    aaguid = Column(String(36), nullable=True)                  # authenticator model
+    backed_up = Column(Boolean, nullable=False, default=False)  # synced passkey (iCloud / Google / password manager)
+    name = Column(String(64), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    last_used_at = Column(DateTime(timezone=True), nullable=True)
+
+    user = relationship("User", back_populates="passkeys")
+
+
+class WebAuthnChallenge(Base):
+    """Single-use WebAuthn challenge (deleted when verified; expires after 5 minutes)."""
+    __tablename__ = "webauthn_challenges"
+
+    id_ = Column(String(43), primary_key=True)                  # random URL-safe id handed to the client
+    challenge = Column(LargeBinary, nullable=False)
+    purpose = Column(String(16), nullable=False)                # register | login
+    user_id = Column(Integer, ForeignKey("users.id_", ondelete="CASCADE"), nullable=True)
+    expires_at = Column(DateTime(timezone=True), nullable=False, index=True)
