@@ -2,8 +2,8 @@
 # Setup guide: docs/DEPLOY_RENDER.md
 #
 # The URLs below assume the service names are free on onrender.com. If Render gives a
-# service a different URL, update every `financehub-api.onrender.com` and
-# `financehub.onrender.com` value here (or in the dashboard) and redeploy.
+# service a different URL, update every `financehub-api-*.onrender.com` and
+# `financehub-*.onrender.com` value here (or in the dashboard) and redeploy.
 
 services:
   # ── Backend ────────────────────────────────────────────────────────────────
@@ -41,13 +41,13 @@ services:
       - key: NBU_API_URL
         value: https://bank.gov.ua/NBUStatService/v1/statdirectory/exchange?json
       - key: FRONTEND_URL
-        value: https://financehub.onrender.com
+        value: https://financehub-y7al.onrender.com
       # Public API base for calendar subscription links
       - key: PUBLIC_API_URL
-        value: https://financehub-api.onrender.com
+        value: https://financehub-api-2uwh.onrender.com
       # Passkeys are bound to this domain; changing it later invalidates existing passkeys
       - key: WEBAUTHN_RP_ID
-        value: financehub.onrender.com
+        value: financehub-y7al.onrender.com
       # Render's proxy is always in front: trust X-Forwarded-For / -Proto
       - key: TRUST_PROXY_HEADERS
         value: "true"
@@ -85,12 +85,12 @@ services:
         value: "22"
       # Used for the OAuth login links; API calls go through the /api rewrite below
       - key: VITE_BACKEND_URL
-        value: https://financehub-api.onrender.com
+        value: https://financehub-api-2uwh.onrender.com
     # Same job as frontend/nginx.conf: /api → backend (same origin for the browser), SPA fallback
     routes:
       - type: rewrite
         source: /api/*
-        destination: https://financehub-api.onrender.com/api/*
+        destination: https://financehub-api-2uwh.onrender.com/api/*
       - type: rewrite
         source: /*
         destination: /index.html
