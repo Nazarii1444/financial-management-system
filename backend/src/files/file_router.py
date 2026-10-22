@@ -19,13 +19,14 @@ Scan flow: upload → client shows `draft` for review → user confirms with `{}
 """
 import asyncio
 from typing import List, Optional
+from urllib.parse import quote
 
 from fastapi import APIRouter, Body, Depends, File, HTTPException, Query, UploadFile, status
-from fastapi.responses import FileResponse
-from sqlalchemy import select
+from fastapi.responses import Response
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.config import MAX_UPLOAD_SIZE_MB, UPLOAD_DIR, logger
+from src.config import MAX_RECEIPTS_PER_USER, MAX_UPLOAD_SIZE_MB, logger
 from src.database import get_db
 from src.dependencies import get_current_user
 from src.files.schemas import (
@@ -38,7 +39,7 @@ from src.files.schemas import (
 )
 from src.files.services import ocr_service
 from src.files.services.receipt_transaction_service import build_draft, create_transaction_from_receipt
-from src.files.services.storage_service import LocalStorageService
+from src.files.services.storage_service import get_storage
 from src.models import Receipt, Transaction, User
 from src.transactions.schemas import TransactionOut
 from src.transactions.services.transaction_service import transaction_to_out
@@ -54,8 +55,8 @@ _ALLOWED_CONTENT_TYPES = {
 }
 _MAX_BYTES = MAX_UPLOAD_SIZE_MB * 1024 * 1024
 
-# Single shared storage instance (swap to S3Service here if needed)
-_storage = LocalStorageService(UPLOAD_DIR)
+# Single shared storage instance: local UPLOAD_DIR or Postgres, depending on FILE_STORAGE
+_storage = get_storage()
 
 
 # ── Guard ─────────────────────────────────────────────────────────────────────
@@ -94,6 +95,16 @@ async def upload_receipt(
     session: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    # ── Per-user quota ────────────────────────────────────────────────────────
+    count = (await session.execute(
+        select(func.count()).select_from(Receipt).where(Receipt.user_id == current_user.id_)
+    )).scalar_one()
+    if count >= MAX_RECEIPTS_PER_USER:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Receipt limit reached ({MAX_RECEIPTS_PER_USER} files). Delete a receipt to upload a new one.",
+        )
+
     # ── Validate content type ─────────────────────────────────────────────────
     content_type = (file.content_type or "").lower()
     if content_type not in _ALLOWED_CONTENT_TYPES:
@@ -265,17 +276,16 @@ async def download_receipt(
     current_user: User = Depends(get_current_user),
 ):
     receipt = await _get_user_receipt_or_404(session, receipt_id, current_user.id_)
-    abs_path = _storage.absolute_path(receipt.file_path)
-
-    import os
-    if not os.path.isfile(abs_path):
+    try:
+        data = await _storage.read(receipt.file_path)
+    except FileNotFoundError:
         raise HTTPException(status_code=404, detail="File not found on disk")
 
-    return FileResponse(
-        path=abs_path,
-        media_type=receipt.content_type,
-        filename=receipt.original_filename,
-    )
+    # Same Content-Disposition as FileResponse: RFC 5987 form for non-ASCII names
+    filename = receipt.original_filename
+    quoted = quote(filename)
+    disposition = f"attachment; filename*=utf-8''{quoted}" if quoted != filename else f'attachment; filename="{filename}"'
+    return Response(content=data, media_type=receipt.content_type, headers={"Content-Disposition": disposition})
 
 
 # ── Link / unlink to transaction ──────────────────────────────────────────────

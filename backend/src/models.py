@@ -268,6 +268,19 @@ class Receipt(Base):
     transaction = relationship("Transaction", back_populates="receipts")
 
 
+class ReceiptFile(Base):
+    """
+    Raw bytes of an uploaded receipt when FILE_STORAGE=database (hosts without a
+    persistent disk). file_path matches Receipt.file_path.
+    """
+    __tablename__ = "receipt_files"
+
+    id_ = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id_", ondelete="CASCADE"), nullable=False, index=True)
+    file_path = Column(String(512), nullable=False, unique=True)
+    data = Column(LargeBinary, nullable=False)
+
+
 class TransactionTemplate(Base):
     """
     Saved transaction preset ("morning coffee") used with one click from the

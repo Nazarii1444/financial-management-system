@@ -1,0 +1,100 @@
+# Render Blueprint: FastAPI backend (Docker) + React static site; Postgres lives on Neon.
+# Setup guide: docs/DEPLOY_RENDER.md
+#
+# The URLs below assume the service names are free on onrender.com. If Render gives a
+# service a different URL, update every `financehub-api.onrender.com` and
+# `financehub.onrender.com` value here (or in the dashboard) and redeploy.
+
+services:
+  # ── Backend ────────────────────────────────────────────────────────────────
+  - type: web
+    name: financehub-api
+    runtime: docker
+    plan: free
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    healthCheckPath: /health/
+    buildFilter:
+      paths:
+        - backend/**
+    envVars:
+      - key: APP_ENV
+        value: production
+      # Neon → Connection Details → *direct* (non-pooled) connection string
+      - key: DATABASE_URL
+        sync: false
+      # Keep well below Neon's connection limit (one worker on the free instance)
+      - key: DB_POOL_SIZE
+        value: "5"
+      - key: DB_MAX_OVERFLOW
+        value: "5"
+      - key: SECRET_KEY
+        generateValue: true
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: ALGORITHM
+        value: HS256
+      - key: ACCESS_TOKEN_EXPIRE_MINUTES
+        value: "120"
+      - key: REFRESH_TOKEN_EXPIRE_DAYS
+        value: "30"
+      - key: NBU_API_URL
+        value: https://bank.gov.ua/NBUStatService/v1/statdirectory/exchange?json
+      - key: FRONTEND_URL
+        value: https://financehub.onrender.com
+      # Public API base for calendar subscription links
+      - key: PUBLIC_API_URL
+        value: https://financehub-api.onrender.com
+      # Passkeys are bound to this domain; changing it later invalidates existing passkeys
+      - key: WEBAUTHN_RP_ID
+        value: financehub.onrender.com
+      # Render's proxy is always in front: trust X-Forwarded-For / -Proto
+      - key: TRUST_PROXY_HEADERS
+        value: "true"
+      - key: FORWARDED_ALLOW_IPS
+        value: "*"
+      - key: SEED_DATA
+        value: "false"
+      # Receipts: the free instance's disk is wiped on every restart/sleep, so keep
+      # the file bytes in Postgres (Neon), max 5 files per user
+      - key: FILE_STORAGE
+        value: database
+      - key: MAX_RECEIPTS_PER_USER
+        value: "5"
+      # Optional OAuth sign-in
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: GITHUB_CLIENT_ID
+        sync: false
+      - key: GITHUB_CLIENT_SECRET
+        sync: false
+
+  # ── Frontend ───────────────────────────────────────────────────────────────
+  - type: web
+    name: financehub
+    runtime: static
+    buildCommand: cd frontend && npm ci && npm run build
+    staticPublishPath: ./frontend/dist
+    buildFilter:
+      paths:
+        - frontend/**
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      # Used for the OAuth login links; API calls go through the /api rewrite below
+      - key: VITE_BACKEND_URL
+        value: https://financehub-api.onrender.com
+    # Same job as frontend/nginx.conf: /api → backend (same origin for the browser), SPA fallback
+    routes:
+      - type: rewrite
+        source: /api/*
+        destination: https://financehub-api.onrender.com/api/*
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    headers:
+      - path: /assets/*
+        name: Cache-Control
+        value: public, max-age=31536000, immutable

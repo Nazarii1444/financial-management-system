@@ -1,7 +1,7 @@
 import os
 import logging
 from pathlib import Path
-from urllib.parse import urlparse
+from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 from dotenv import load_dotenv
 from datetime import timedelta
 
@@ -21,7 +21,22 @@ DB_HOST: str = os.getenv("DB_HOST", default="127.0.0.1")
 DB_PORT: int = os.getenv("DB_PORT", default=5432)
 DB_NAME: str = os.getenv("DB_NAME", default="annadb")
 
-DATABASE_URL: str = f"postgresql+asyncpg://{POSTGRES_USER}:{POSTGRES_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+def _asyncpg_url(url: str) -> str:
+    """Turn a hosted-Postgres URL (Neon: postgresql://...?sslmode=require&channel_binding=require)
+    into one SQLAlchemy's asyncpg driver accepts: asyncpg takes `ssl`, not `sslmode`/`channel_binding`."""
+    parsed = urlparse(url)
+    query = dict(parse_qsl(parsed.query))
+    query.pop("channel_binding", None)
+    if "sslmode" in query:
+        query["ssl"] = query.pop("sslmode")
+    return urlunparse(parsed._replace(scheme="postgresql+asyncpg", query=urlencode(query)))
+
+
+# A full connection string (hosted DBs such as Neon) wins over the separate DB_* settings
+DATABASE_URL: str = (
+    _asyncpg_url(os.environ["DATABASE_URL"]) if os.getenv("DATABASE_URL")
+    else f"postgresql+asyncpg://{POSTGRES_USER}:{POSTGRES_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+)
 
 # Connection pool per worker process (SQLAlchemy default is 5 + 10 overflow).
 # Keep workers × (size + overflow) below Postgres max_connections (100 by default): 4 × 20 = 80.
@@ -121,6 +136,11 @@ JWT_REFRESH_COOKIE_NAME = "refresh_token"
 # ===== File storage =====
 UPLOAD_DIR: str = os.getenv("UPLOAD_DIR", "./uploads")
 MAX_UPLOAD_SIZE_MB: int = int(os.getenv("MAX_UPLOAD_SIZE_MB", "20"))
+# Receipts per user; the oldest must be deleted before uploading more
+MAX_RECEIPTS_PER_USER: int = int(os.getenv("MAX_RECEIPTS_PER_USER", "5"))
+# "local" → files under UPLOAD_DIR; "database" → bytes in Postgres (receipt_files table),
+# for hosts without a persistent disk such as Render's free tier
+FILE_STORAGE: str = os.getenv("FILE_STORAGE", "local").strip().lower()
 
 # ===== Github =====
 GITHUB_CLIENT_ID = os.getenv("GITHUB_CLIENT_ID")
