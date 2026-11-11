@@ -2,13 +2,14 @@ import io
 import base64
 import pyotp
 import qrcode
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from src.database import get_db
 from src.models import User
 from src.dependencies import get_current_user
+from src.security.events import EventType, record_event
 from src.two_fa.schemas import TwoFASetupResponse, TwoFAVerifyRequest
 
 two_fa_router = APIRouter()
@@ -46,6 +47,7 @@ async def setup_2fa(
 @two_fa_router.post("/verify")
 async def verify_2fa(
     payload: TwoFAVerifyRequest,
+    request: Request,
     session: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -60,12 +62,14 @@ async def verify_2fa(
 
     user.twofa_enabled = True
     await session.commit()
+    await record_event(session, user.id_, EventType.TWOFA_ENABLED, request, method="totp")
     return {"message": "2FA enabled successfully"}
 
 
 @two_fa_router.post("/disable", status_code=status.HTTP_200_OK)
 async def disable_2fa(
     payload: TwoFAVerifyRequest,
+    request: Request,
     session: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -84,4 +88,5 @@ async def disable_2fa(
     user.twofa_enabled = False
     user.twofa_secret = None
     await session.commit()
+    await record_event(session, user.id_, EventType.TWOFA_DISABLED, request, method="totp")
     return {"message": "2FA disabled successfully"}

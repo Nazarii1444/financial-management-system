@@ -1,0 +1,3 @@
+# Load-testing tools only (not needed to run the app).
+# pip install -r requirements-loadtest.txt
+locust==2.46.7

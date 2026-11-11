@@ -34,6 +34,8 @@ import { categoryColor, goalAppearance, kindKey, monthRange, toNumber } from '..
 import { buildInsights } from '../lib/insights';
 import { AsyncBlock, EmptyState } from '../components/common/States';
 import { GoalIcon } from '../components/common/GoalIcon';
+import { QuickTemplates } from '../components/templates/QuickTemplates';
+import { SafeToSpendCard } from '../components/dashboard/SafeToSpendCard';
 import { TxKind } from '../types/api';
 
 function ChangeBadge({ value, invert = false, suffix }: { value: number | null | undefined; invert?: boolean; suffix: string }) {
@@ -65,6 +67,7 @@ export function Dashboard() {
   const categories = useApi(() => analyticsApi.categories(TxKind.EXPENSE, monthRange()), []);
   const recent = useApi(() => transactionsApi.list({ limit: 5 }), []);
   const goals = useApi(() => goalsApi.list({ is_completed: false }), []);
+  const txCategories = useApi(() => transactionsApi.categories(), []);
 
   const money = (n: number) => formatMoney(n, currency);
   const insights = buildInsights({
@@ -87,6 +90,12 @@ export function Dashboard() {
           {user ? fmt(t.dashboard.welcome, { name: user.username }) : t.dashboard.overviewActivity}
         </p>
       </div>
+
+      {/* Safe-to-spend: today's allowance after planned payments and goals */}
+      <SafeToSpendCard />
+
+      {/* One-click templates */}
+      <QuickTemplates categories={txCategories.data} />
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

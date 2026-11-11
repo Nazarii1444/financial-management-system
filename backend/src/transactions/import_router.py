@@ -1,5 +1,12 @@
 """
-Transaction import from CSV / Excel (.xlsx).
+Transaction import from CSV / Excel (.xlsx) and bank statements.
+
+`POST /statement/preview` + `POST /statement/confirm` (used by the UI) accept
+bank exports — monobank PDF / CSV / XLSX, see `statements/` — as well as the
+app's own CSV / XLSX format below, show a reviewable preview and import the
+chosen rows. The legacy one-shot `POST ""` endpoint is kept for scripts.
+The preview also opens passphrase-encrypted exports (`.fhx`, `src/exports/crypto.py`):
+the `passphrase` form field decrypts them, then they go through the same parsers.
 
 Expected columns (case-insensitive header):
   name*, amount*, kind* (EXPENSE | INCOME | TRANSFER),
@@ -14,14 +21,19 @@ from decimal import Decimal, InvalidOperation
 from typing import Any, Dict, List, Optional, Tuple
 
 from dateutil import parser as dateutil_parser
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status
+from fastapi import APIRouter, Depends, Form, HTTPException, UploadFile, File, status
+from fastapi.concurrency import run_in_threadpool
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.database import get_db
+from src.exports import crypto
 from src.dependencies import get_current_user
 from src.models import Transaction, TransactionKind, User
 from src.transactions.currency_converter import convert_to_user_currency
 from src.transactions.transaction_router import _validate_category
+from src.transactions.statements import service as statement_service
+from src.transactions.statements.detect import MAX_FILE_BYTES, parse_statement, sniff_format
+from src.transactions.statements.schemas import StatementImportIn, StatementImportOut, StatementPreviewOut
 
 try:
     import openpyxl
@@ -72,6 +84,14 @@ def _parse_date(raw: Optional[str]) -> Optional[datetime]:
         return None
 
 
+def _parse_amount(raw: Any) -> Decimal:
+    """'1234.5', '1 234,50' (Excel, uk locale) → Decimal."""
+    text = str(raw).strip().replace("\u00a0", "").replace(" ", "")
+    if "," in text and "." not in text:
+        text = text.replace(",", ".")
+    return Decimal(text)
+
+
 def _parse_rows(rows: List[Dict[str, Any]]) -> Tuple[List[Dict], List[str]]:
     """Returns (valid_rows, error_messages)."""
     valid: List[Dict] = []
@@ -86,7 +106,7 @@ def _parse_rows(rows: List[Dict[str, Any]]) -> Tuple[List[Dict], List[str]]:
 
         # amount
         try:
-            amount = Decimal(str(row["amount"]).strip())
+            amount = _parse_amount(row["amount"])
             if amount <= 0:
                 raise ValueError
         except (InvalidOperation, ValueError):
@@ -131,7 +151,10 @@ def _parse_rows(rows: List[Dict[str, Any]]) -> Tuple[List[Dict], List[str]]:
 
 def _csv_to_rows(content: bytes) -> List[Dict[str, Any]]:
     text = content.decode("utf-8-sig")
-    reader = csv.DictReader(io.StringIO(text))
+    # Excel with Ukrainian regional settings (and our own export) uses ';'
+    header = text.split("\n", 1)[0]
+    delimiter = ";" if header.count(";") > header.count(",") else ","
+    reader = csv.DictReader(io.StringIO(text), delimiter=delimiter)
     return [dict(r) for r in reader]
 
 
@@ -220,3 +243,74 @@ async def import_transactions(
         "new_capital": current_user.capital,
     }
 
+
+
+# ── Bank statements: preview → confirm ───────────────────────────────────────
+
+@import_router.post("/statement/preview", response_model=StatementPreviewOut,
+                    summary="Parse a bank statement (monobank PDF / CSV / XLSX) or app CSV / XLSX; nothing is saved")
+async def preview_statement(
+    file: UploadFile = File(...),
+    passphrase: Optional[str] = Form(None, description="For encrypted exports (.fhx)"),
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    content = await file.read(MAX_FILE_BYTES + 1)
+    if not content:
+        raise HTTPException(status_code=422, detail="File is empty")
+    if len(content) > MAX_FILE_BYTES:
+        raise HTTPException(status_code=413, detail="File is too large")
+    if crypto.is_encrypted(content):
+        # Machine-readable details: the UI asks for (another) passphrase and retries
+        if not passphrase:
+            raise HTTPException(status_code=422, detail="passphrase_required")
+        try:
+            content = await run_in_threadpool(crypto.decrypt, content, passphrase)
+        except crypto.WrongPassphrase:
+            raise HTTPException(status_code=422, detail="wrong_passphrase")
+        except crypto.CorruptFile:
+            raise HTTPException(status_code=422, detail="corrupt_file")
+
+    statement = parse_statement(content)
+    if statement is not None:
+        rows = statement_service.preview_rows(statement)
+        meta = {
+            "bank": statement.bank, "bank_name": statement.bank_name, "file_format": statement.file_format,
+            "currency": statement.currency, "period_from": statement.period_from, "period_to": statement.period_to,
+            "opening_balance": statement.opening_balance, "closing_balance": statement.closing_balance,
+            "warnings": statement.warnings,
+        }
+    else:
+        fmt = sniff_format(content)
+        if fmt == "pdf":
+            raise HTTPException(status_code=422, detail="Unsupported statement: this PDF layout is not recognised (supported: monobank)")
+        raw_rows = _csv_to_rows(content) if fmt == "csv" else _xlsx_to_rows(content)
+        valid_rows, errors = _parse_rows(raw_rows)
+        if not valid_rows:
+            raise HTTPException(status_code=422, detail="Unsupported file: no recognisable transactions" + (f" ({errors[0]})" if errors else ""))
+        rows = statement_service.generic_preview_rows(valid_rows, current_user.default_currency)
+        meta = {
+            "bank": "generic", "bank_name": "CSV / Excel", "file_format": fmt, "currency": None,
+            "period_from": None, "period_to": None, "opening_balance": None, "closing_balance": None,
+            "warnings": errors[:20],
+        }
+
+    await statement_service.flag_existing(session, current_user, rows)
+    dates = [r["date"].date() for r in rows if r["date"]]
+    meta["period_from"] = meta["period_from"] or (min(dates) if dates else None)
+    meta["period_to"] = meta["period_to"] or (max(dates) if dates else None)
+    return {**meta, "rows": rows}
+
+
+@import_router.post("/statement/confirm", response_model=StatementImportOut, status_code=status.HTTP_201_CREATED)
+async def confirm_statement(
+    payload: StatementImportIn,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    result = await statement_service.confirm_import(
+        session, current_user, payload.bank, payload.rows, payload.update_balance,
+    )
+    await session.commit()
+    await session.refresh(current_user)
+    return {**result, "new_capital": current_user.capital}

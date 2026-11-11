@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 from decimal import Decimal
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -10,6 +10,7 @@ from src.database import get_db
 from src.dependencies import get_current_user
 from src.goals.schemas import GoalCreate, GoalDepositWithdraw, GoalOut, GoalUpdate
 from src.models import Currencies, Goal, User
+from src.notifications.service import notify_goal_progress, progress_percent
 
 goal_router = APIRouter()
 
@@ -126,14 +127,16 @@ async def delete_goal(
 async def deposit_to_goal(
         goal_id: int,
         payload: GoalDepositWithdraw,
+        background: BackgroundTasks,
         session: AsyncSession = Depends(get_db),
         current_user: User = Depends(get_current_user),
 ):
-    """Add money to a savings jar."""
+    """Add money to a savings jar. Crossing 25 / 50 / 75 / 100 % sends a milestone e-mail."""
     goal = await _get_user_goal_or_404(session, goal_id, current_user.id_)
     if goal.is_completed:
         raise HTTPException(status_code=409, detail="Goal is already completed")
 
+    before_percent = progress_percent(goal.saved_amount, goal.target_amount)
     goal.saved_amount = Decimal(str(goal.saved_amount)) + payload.amount
 
     # Auto-complete if target reached
@@ -144,6 +147,7 @@ async def deposit_to_goal(
 
     await session.commit()
     await session.refresh(goal)
+    background.add_task(notify_goal_progress, goal.id_, before_percent)
     return goal
 
 

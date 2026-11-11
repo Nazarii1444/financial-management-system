@@ -1,0 +1,368 @@
+{
+  "meta": {
+    "started_at": "2026-10-18T20:12:18",
+    "git_sha": "94b8259",
+    "git_dirty": true,
+    "host": "http://127.0.0.1:8002",
+    "users": 20,
+    "spawn_rate": 20,
+    "duration_s": 20,
+    "warmup_s": 5,
+    "wait_s": 0.0,
+    "machine": "Windows 10, 8 CPU, Python 3.11.9",
+    "label": "search3_before_r3",
+    "elapsed_s": 239
+  },
+  "endpoints": [
+    {
+      "endpoint": "tx_search_text",
+      "group": "read",
+      "rows": [
+        {
+          "name": "GET /api/transactions/search?q",
+          "requests": 908,
+          "failures": 0,
+          "error_pct": 0.0,
+          "rps": 43.2,
+          "avg_ms": 457.5,
+          "p50_ms": 440.0,
+          "p95_ms": 800.0,
+          "p99_ms": 1000.0,
+          "max_ms": 1214.0366999665275
+        },
+        {
+          "name": "Aggregated",
+          "requests": 908,
+          "failures": 0,
+          "error_pct": 0.0,
+          "rps": 43.2,
+          "avg_ms": 457.5,
+          "p50_ms": 440.0,
+          "p95_ms": 800.0,
+          "p99_ms": 1000.0,
+          "max_ms": 1214.0366999665275
+        }
+      ]
+    },
+    {
+      "endpoint": "tx_search_filtered",
+      "group": "read",
+      "rows": [
+        {
+          "name": "GET /api/transactions/search?filters",
+          "requests": 5021,
+          "failures": 0,
+          "error_pct": 0.0,
+          "rps": 240.0,
+          "avg_ms": 82.2,
+          "p50_ms": 88.0,
+          "p95_ms": 140.0,
+          "p99_ms": 190.0,
+          "max_ms": 293.93269994761795
+        },
+        {
+          "name": "Aggregated",
+          "requests": 5021,
+          "failures": 0,
+          "error_pct": 0.0,
+          "rps": 240.0,
+          "avg_ms": 82.2,
+          "p50_ms": 88.0,
+          "p95_ms": 140.0,
+          "p99_ms": 190.0,
+          "max_ms": 293.93269994761795
+        }
+      ]
+    },
+    {
+      "endpoint": "export_csv",
+      "group": "read",
+      "rows": [
+        {
+          "name": "GET /api/exports/transactions.csv",
+          "requests": 607,
+          "failures": 0,
+          "error_pct": 0.0,
+          "rps": 29.2,
+          "avg_ms": 674.1,
+          "p50_ms": 660.0,
+          "p95_ms": 830.0,
+          "p99_ms": 880.0,
+          "max_ms": 997.371600009501
+        },
+        {
+          "name": "Aggregated",
+          "requests": 607,
+          "failures": 0,
+          "error_pct": 0.0,
+          "rps": 29.2,
+          "avg_ms": 674.1,
+          "p50_ms": 660.0,
+          "p95_ms": 830.0,
+          "p99_ms": 880.0,
+          "max_ms": 997.371600009501
+        }
+      ]
+    },
+    {
+      "endpoint": "tx_list",
+      "group": "read",
+      "rows": [
+        {
+          "name": "GET /api/transactions",
+          "requests": 7263,
+          "failures": 0,
+          "error_pct": 0.0,
+          "rps": 346.8,
+          "avg_ms": 56.5,
+          "p50_ms": 52.0,
+          "p95_ms": 110.0,
+          "p99_ms": 150.0,
+          "max_ms": 207.04390003811568
+        },
+        {
+          "name": "Aggregated",
+          "requests": 7263,
+          "failures": 0,
+          "error_pct": 0.0,
+          "rps": 346.8,
+          "avg_ms": 56.5,
+          "p50_ms": 52.0,
+          "p95_ms": 110.0,
+          "p99_ms": 150.0,
+          "max_ms": 207.04390003811568
+        }
+      ]
+    },
+    {
+      "endpoint": "tx_list_filtered",
+      "group": "read",
+      "rows": [
+        {
+          "name": "GET /api/transactions?kind&category&date_from",
+          "requests": 5446,
+          "failures": 0,
+          "error_pct": 0.0,
+          "rps": 260.1,
+          "avg_ms": 75.3,
+          "p50_ms": 65.0,
+          "p95_ms": 150.0,
+          "p99_ms": 240.0,
+          "max_ms": 424.3295000633225
+        },
+        {
+          "name": "Aggregated",
+          "requests": 5446,
+          "failures": 0,
+          "error_pct": 0.0,
+          "rps": 260.1,
+          "avg_ms": 75.3,
+          "p50_ms": 65.0,
+          "p95_ms": 150.0,
+          "p99_ms": 240.0,
+          "max_ms": 424.3295000633225
+        }
+      ]
+    },
+    {
+      "endpoint": "tx_get",
+      "group": "read",
+      "rows": [
+        {
+          "name": "GET /api/transactions/{id}",
+          "requests": 14228,
+          "failures": 0,
+          "error_pct": 0.0,
+          "rps": 673.0,
+          "avg_ms": 29.0,
+          "p50_ms": 28.0,
+          "p95_ms": 46.0,
+          "p99_ms": 85.0,
+          "max_ms": 220.7838000031188
+        },
+        {
+          "name": "Aggregated",
+          "requests": 14228,
+          "failures": 0,
+          "error_pct": 0.0,
+          "rps": 673.0,
+          "avg_ms": 29.0,
+          "p50_ms": 28.0,
+          "p95_ms": 46.0,
+          "p99_ms": 85.0,
+          "max_ms": 220.7838000031188
+        }
+      ]
+    },
+    {
+      "endpoint": "analytics_overview",
+      "group": "read",
+      "rows": [
+        {
+          "name": "GET /api/analytics/overview",
+          "requests": 800,
+          "failures": 0,
+          "error_pct": 0.0,
+          "rps": 38.1,
+          "avg_ms": 519.9,
+          "p50_ms": 460.0,
+          "p95_ms": 850.0,
+          "p99_ms": 870.0,
+          "max_ms": 2240.7628999790177
+        },
+        {
+          "name": "Aggregated",
+          "requests": 800,
+          "failures": 0,
+          "error_pct": 0.0,
+          "rps": 38.1,
+          "avg_ms": 519.9,
+          "p50_ms": 460.0,
+          "p95_ms": 850.0,
+          "p99_ms": 870.0,
+          "max_ms": 2240.7628999790177
+        }
+      ]
+    },
+    {
+      "endpoint": "tx_create_delete",
+      "group": "write",
+      "rows": [
+        {
+          "name": "POST /api/transactions",
+          "requests": 2130,
+          "failures": 0,
+          "error_pct": 0.0,
+          "rps": 101.8,
+          "avg_ms": 91.0,
+          "p50_ms": 83.0,
+          "p95_ms": 180.0,
+          "p99_ms": 230.0,
+          "max_ms": 450.0191999832168
+        },
+        {
+          "name": "DELETE /api/transactions/trash/{id}",
+          "requests": 2118,
+          "failures": 0,
+          "error_pct": 0.0,
+          "rps": 101.2,
+          "avg_ms": 25.0,
+          "p50_ms": 25.0,
+          "p95_ms": 40.0,
+          "p99_ms": 48.0,
+          "max_ms": 117.41910001728684
+        },
+        {
+          "name": "DELETE /api/transactions/{id}",
+          "requests": 2121,
+          "failures": 0,
+          "error_pct": 0.0,
+          "rps": 101.4,
+          "avg_ms": 80.1,
+          "p50_ms": 76.0,
+          "p95_ms": 140.0,
+          "p99_ms": 170.0,
+          "max_ms": 332.148400018923
+        },
+        {
+          "name": "Aggregated",
+          "requests": 6369,
+          "failures": 0,
+          "error_pct": 0.0,
+          "rps": 304.4,
+          "avg_ms": 65.4,
+          "p50_ms": 60.0,
+          "p95_ms": 150.0,
+          "p99_ms": 200.0,
+          "max_ms": 450.0191999832168
+        }
+      ]
+    },
+    {
+      "endpoint": "tx_update",
+      "group": "write",
+      "rows": [
+        {
+          "name": "PATCH /api/transactions/{id}",
+          "requests": 7921,
+          "failures": 0,
+          "error_pct": 0.0,
+          "rps": 378.5,
+          "avg_ms": 52.5,
+          "p50_ms": 52.0,
+          "p95_ms": 61.0,
+          "p99_ms": 89.0,
+          "max_ms": 165.3165000025183
+        },
+        {
+          "name": "Aggregated",
+          "requests": 7921,
+          "failures": 0,
+          "error_pct": 0.0,
+          "rps": 378.5,
+          "avg_ms": 52.5,
+          "p50_ms": 52.0,
+          "p95_ms": 61.0,
+          "p99_ms": 89.0,
+          "max_ms": 165.3165000025183
+        }
+      ]
+    },
+    {
+      "endpoint": "template_use",
+      "group": "write",
+      "rows": [
+        {
+          "name": "POST /api/templates/{id}/use",
+          "requests": 1973,
+          "failures": 0,
+          "error_pct": 0.0,
+          "rps": 94.3,
+          "avg_ms": 106.7,
+          "p50_ms": 89.0,
+          "p95_ms": 230.0,
+          "p99_ms": 320.0,
+          "max_ms": 509.863399900496
+        },
+        {
+          "name": "DELETE /api/transactions/trash/{id}",
+          "requests": 1964,
+          "failures": 0,
+          "error_pct": 0.0,
+          "rps": 93.8,
+          "avg_ms": 21.3,
+          "p50_ms": 21.0,
+          "p95_ms": 33.0,
+          "p99_ms": 38.0,
+          "max_ms": 99.47839996311814
+        },
+        {
+          "name": "DELETE /api/transactions/{id}",
+          "requests": 1967,
+          "failures": 0,
+          "error_pct": 0.0,
+          "rps": 94.0,
+          "avg_ms": 83.1,
+          "p50_ms": 73.0,
+          "p95_ms": 160.0,
+          "p99_ms": 240.0,
+          "max_ms": 403.3641000278294
+        },
+        {
+          "name": "Aggregated",
+          "requests": 5904,
+          "failures": 0,
+          "error_pct": 0.0,
+          "rps": 282.1,
+          "avg_ms": 70.4,
+          "p50_ms": 60.0,
+          "p95_ms": 180.0,
+          "p99_ms": 270.0,
+          "max_ms": 509.863399900496
+        }
+      ]
+    }
+  ],
+  "mixed": null,
+  "max_rps": []
+}

@@ -9,33 +9,51 @@ Endpoints
   POST /logout              instructs client to discard tokens
   PATCH /password           change password (requires current password)
   POST /2fa/complete        finish login when requires_2fa=True
+  POST /password-reset/request   e-mail a 6-digit code (same answer for unknown e-mails)
+  POST /password-reset/verify    check the code (does not use it)
+  POST /password-reset/confirm   code + new password → password set, code burnt
+
+Passkey sign-in lives in `src/security/passkey_router.py` (/api/passkeys).
+Every sign-in and failed attempt on an existing account is written to the
+security history (`src/security/events.py`).
 """
 from datetime import datetime, timezone
 
 import pyotp
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.auth import password_reset
 from src.auth.auth_services import (
     authenticate_user,
     change_password,
     check_password_strength,
-    create_user
+    create_user,
+    needs_breach_recheck,
+    refresh_password_health,
+    reset_password,
 )
 from src.auth.schemas import (
     LoginResponse,
     PasswordChangeRequest,
+    PasswordResetConfirm,
+    PasswordResetRequest,
+    PasswordResetVerify,
     RefreshRequest,
     TwoFACompleteRequest,
     TokenPair,
     UserCreate,
     UserLogin,
 )
-from src.config import logger
-from src.database import get_db
+from src.config import FRONTEND_URL, PASSWORD_RESET_CODE_TTL_MINUTES, logger
+from src.database import AsyncSessionLocal, get_db
 from src.dependencies import get_current_user
 from src.models import User
+from src.notifications import templates as email_templates
+from src.notifications.mailer import send_email
+from src.notifications.service import load_prefs
+from src.security.events import EventType, record_event
 from src.utils.exceptions import (
     email_already_registered_exception,
     invalid_credentials_exception,
@@ -55,52 +73,75 @@ from src.utils.security import decode_token
 auth_router = APIRouter()
 
 
+async def _token_pair(user_id: int) -> TokenPair:
+    return TokenPair(
+        access_token=await create_access_token({"sub": str(user_id)}),
+        refresh_token=await create_refresh_token({"sub": str(user_id)}),
+    )
+
+
+async def _refresh_password_health(user_id: int, password: str) -> None:
+    """Background: HIBP re-check after the response, in its own session."""
+    async with AsyncSessionLocal() as db:
+        user = (await db.execute(select(User).where(User.id_ == user_id))).scalar_one_or_none()
+        if user:
+            await refresh_password_health(db, user, password)
+
+
 # ── Register ──────────────────────────────────────────────────────────────────
 
 @auth_router.post("/signup", response_model=LoginResponse, status_code=status.HTTP_201_CREATED)
-async def sign_up(user: UserCreate, db: AsyncSession = Depends(get_db)):
+async def sign_up(user: UserCreate, request: Request, db: AsyncSession = Depends(get_db)):
     if await get_user_by_email(db, user.email):
         raise email_already_registered_exception
     if await get_user_by_username(db, user.username):
         raise username_already_registered_exception
 
-    errors = await check_password_strength(user.password)   # now async
+    errors = await check_password_strength(user.password, user.username, user.email)
     if errors:
         raise HTTPException(status_code=400, detail=errors)
 
     new_user = await create_user(db, user)
-    access_token  = await create_access_token({"sub": str(new_user.id_)})
-    refresh_token = await create_refresh_token({"sub": str(new_user.id_)})
+    await record_event(db, new_user.id_, EventType.SIGNUP, request, method="password")
+    pair = await _token_pair(new_user.id_)
     logger.info("New user registered: id=%s email=%s", new_user.id_, new_user.email)
-    return LoginResponse(access_token=access_token, refresh_token=refresh_token)
+    return LoginResponse(access_token=pair.access_token, refresh_token=pair.refresh_token)
 
 
 # ── Login ─────────────────────────────────────────────────────────────────────
 
 @auth_router.post("/login", response_model=LoginResponse)
-async def login(payload: UserLogin, db: AsyncSession = Depends(get_db)):
+async def login(payload: UserLogin, request: Request, background: BackgroundTasks, db: AsyncSession = Depends(get_db)):
     email = payload.email.strip().lower()
     db_user = await authenticate_user(db, email, payload.password)
     if not db_user:
         logger.info("Login failed for email=%s", email)
+        existing = await get_user_by_email(db, email)
+        if existing:
+            await record_event(db, existing.id_, EventType.LOGIN, request, success=False, method="password",
+                               details={"reason": "wrong_password"})
         raise invalid_credentials_exception
+
+    if needs_breach_recheck(db_user):
+        background.add_task(_refresh_password_health, db_user.id_, payload.password)
 
     # ── 2FA gate ──────────────────────────────────────────────────────────────
     if db_user.twofa_enabled:
         temp_token = await create_2fa_pending_token(db_user.id_)
+        await record_event(db, db_user.id_, EventType.TWOFA_CHALLENGE, request, method="password")
         logger.info("2FA required for user id=%s", db_user.id_)
         return LoginResponse(requires_2fa=True, temp_token=temp_token)
 
-    access_token  = await create_access_token({"sub": str(db_user.id_)})
-    refresh_token = await create_refresh_token({"sub": str(db_user.id_)})
+    await record_event(db, db_user.id_, EventType.LOGIN, request, method="password")
+    pair = await _token_pair(db_user.id_)
     logger.info("User signed in: id=%s email=%s", db_user.id_, email)
-    return LoginResponse(access_token=access_token, refresh_token=refresh_token)
+    return LoginResponse(access_token=pair.access_token, refresh_token=pair.refresh_token)
 
 
 # ── Complete 2FA login ────────────────────────────────────────────────────────
 
 @auth_router.post("/2fa/complete", response_model=TokenPair)
-async def complete_2fa_login(payload: TwoFACompleteRequest, db: AsyncSession = Depends(get_db)):
+async def complete_2fa_login(payload: TwoFACompleteRequest, request: Request, db: AsyncSession = Depends(get_db)):
     """
     Second step when login returns requires_2fa=True.
     Send the temp_token + TOTP code to receive full access/refresh tokens.
@@ -121,12 +162,13 @@ async def complete_2fa_login(payload: TwoFACompleteRequest, db: AsyncSession = D
         raise HTTPException(status_code=401, detail="User not found or 2FA not configured")
 
     if not pyotp.TOTP(user.twofa_secret).verify(payload.code):
+        await record_event(db, user.id_, EventType.LOGIN, request, success=False, method="totp",
+                           details={"reason": "wrong_code"})
         raise HTTPException(status_code=401, detail="Invalid 2FA code")
 
-    access_token  = await create_access_token({"sub": str(user.id_)})
-    refresh_token = await create_refresh_token({"sub": str(user.id_)})
+    await record_event(db, user.id_, EventType.LOGIN, request, method="totp")
     logger.info("2FA login completed for user id=%s", user.id_)
-    return TokenPair(access_token=access_token, refresh_token=refresh_token)
+    return await _token_pair(user.id_)
 
 
 # ── Refresh ───────────────────────────────────────────────────────────────────
@@ -153,20 +195,19 @@ async def refresh_token(payload: RefreshRequest, db: AsyncSession = Depends(get_
     if not user:
         raise HTTPException(status_code=401, detail="User not found")
 
-    new_access  = await create_access_token({"sub": str(user.id_)})
-    new_refresh = await create_refresh_token({"sub": str(user.id_)})
-    return TokenPair(access_token=new_access, refresh_token=new_refresh)
+    return await _token_pair(user.id_)
 
 
 # ── Logout ────────────────────────────────────────────────────────────────────
 
 @auth_router.post("/logout", status_code=status.HTTP_200_OK)
-async def logout(current_user: User = Depends(get_current_user)):
+async def logout(request: Request, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     """
     Stateless logout — instructs the client to discard both tokens.
     JWT tokens are not server-side revocable without a token blacklist (Redis).
     TODO: add Redis token blacklist for instant revocation.
     """
+    await record_event(db, current_user.id_, EventType.LOGOUT, request)
     logger.info("User logged out: id=%s", current_user.id_)
     return {"message": "Logged out successfully. Please discard your tokens."}
 
@@ -176,6 +217,7 @@ async def logout(current_user: User = Depends(get_current_user)):
 @auth_router.patch("/password", status_code=status.HTTP_200_OK)
 async def change_password_endpoint(
     payload: PasswordChangeRequest,
+    request: Request,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -183,7 +225,83 @@ async def change_password_endpoint(
     try:
         await change_password(db, current_user, payload.current_password, payload.new_password)
     except ValueError as exc:
+        if str(exc) == "Current password is incorrect":
+            await record_event(db, current_user.id_, EventType.PASSWORD_CHANGED, request, success=False,
+                               details={"reason": "wrong_current_password"})
         raise HTTPException(status_code=400, detail=str(exc))
 
+    await record_event(db, current_user.id_, EventType.PASSWORD_CHANGED, request)
     logger.info("Password changed for user id=%s", current_user.id_)
+    return {"message": "Password updated successfully"}
+
+
+# ── Password reset by e-mailed code ───────────────────────────────────────────
+
+_RESET_SENT = {"message": "If an account with this e-mail exists, a code has been sent"}
+
+
+@auth_router.post("/password-reset/request", status_code=status.HTTP_200_OK)
+async def request_password_reset(
+    payload: PasswordResetRequest,
+    request: Request,
+    background: BackgroundTasks,
+    db: AsyncSession = Depends(get_db),
+):
+    """E-mail a reset code. The answer is the same whether or not the e-mail is registered."""
+    user = await get_user_by_email(db, payload.email.strip().lower())
+    if user:
+        code = await password_reset.issue_code(db, user)
+        if code:
+            await record_event(db, user.id_, EventType.PASSWORD_RESET_REQUESTED, request)
+            background.add_task(send_email, email_templates.password_reset_code(
+                to=user.email, name=user.username, code=code, ttl_minutes=PASSWORD_RESET_CODE_TTL_MINUTES,
+                lang=payload.lang, frontend_url=FRONTEND_URL,
+            ))
+            logger.info("Password reset code issued for user id=%s", user.id_)
+        else:
+            logger.info("Password reset request rate-limited for user id=%s", user.id_)
+    return _RESET_SENT
+
+
+async def _checked_code(db: AsyncSession, payload: PasswordResetVerify, request: Request):
+    user = await get_user_by_email(db, payload.email.strip().lower())
+    try:
+        row = await password_reset.check_code(db, user, payload.code.strip())
+    except password_reset.ResetError as exc:
+        if user:
+            await record_event(db, user.id_, EventType.PASSWORD_RESET, request, success=False,
+                               details={"reason": str(exc)})
+        raise HTTPException(status_code=400, detail=str(exc))
+    return user, row
+
+
+@auth_router.post("/password-reset/verify", status_code=status.HTTP_200_OK)
+async def verify_password_reset(payload: PasswordResetVerify, request: Request, db: AsyncSession = Depends(get_db)):
+    """Check the code; it stays valid for the confirm step."""
+    await _checked_code(db, payload, request)
+    return {"message": "Code is valid"}
+
+
+@auth_router.post("/password-reset/confirm", status_code=status.HTTP_200_OK)
+async def confirm_password_reset(
+    payload: PasswordResetConfirm,
+    request: Request,
+    background: BackgroundTasks,
+    db: AsyncSession = Depends(get_db),
+):
+    """Set the new password. 2FA stays on: the next sign-in still asks for the TOTP code."""
+    user, row = await _checked_code(db, payload, request)
+    try:
+        await reset_password(db, user, payload.new_password)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    await password_reset.consume(db, row)
+    await db.commit()
+
+    await record_event(db, user.id_, EventType.PASSWORD_RESET, request)
+    background.add_task(send_email, email_templates.password_changed(
+        to=user.email, name=user.username, when=datetime.now(timezone.utc),
+        lang=(await load_prefs(db, [user.id_]))[user.id_].language, frontend_url=FRONTEND_URL,
+    ))
+    logger.info("Password reset completed for user id=%s", user.id_)
     return {"message": "Password updated successfully"}
