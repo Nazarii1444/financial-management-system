@@ -20,7 +20,7 @@ export function VerifyResetCode() {
   const [error, setError] = useState('');
   const navigate = useNavigate();
   const location = useLocation();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
 
   const email: string = location.state?.email || '';
 
@@ -50,7 +50,7 @@ export function VerifyResetCode() {
     setCode('');
     setError('');
     try {
-      await authApi.requestPasswordReset(email);
+      await authApi.requestPasswordReset(email, language);
       toast.success(t.auth.newCodeSent);
     } catch (err) {
       toast.error(err instanceof ApiError && (err.status === 404 || err.status === 405) ? t.auth.resetNotAvailable : errorMessage(err, t));

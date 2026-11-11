@@ -49,6 +49,14 @@ services:
       FRONTEND_URL: http://localhost:${FRONTEND_PORT:-5173}
       UPLOAD_DIR: /app/uploads
       SEED_DATA: ${SEED_DATA:-true}
+      # E-mail: "console" prints messages (incl. password-reset codes) to `docker compose logs backend`
+      EMAIL_BACKEND: ${EMAIL_BACKEND:-console}
+      EMAIL_FROM: ${EMAIL_FROM:-no-reply@financehub.local}
+      BREVO_API_KEY: ${BREVO_API_KEY:-}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USERNAME: ${SMTP_USERNAME:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
       GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-}

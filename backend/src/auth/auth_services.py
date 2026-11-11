@@ -95,6 +95,14 @@ async def change_password(db: AsyncSession, user: User, old_password: str, new_p
     await db.commit()
 
 
+async def reset_password(db: AsyncSession, user: User, new_password: str) -> None:
+    """Set a new password without the old one (the caller proved access to the e-mail). Flushes only."""
+    report = await password_policy.check_password(new_password, user.username, user.email)
+    if report.errors:
+        raise ValueError("; ".join(report.errors))
+    _set_password(user, new_password, report.score, False)
+
+
 async def check_password_strength(password: str, username: Optional[str] = None, email: Optional[str] = None) -> list[str]:
     """Returns a list of error strings; empty list means password is acceptable."""
     return (await password_policy.check_password(password, username, email)).errors

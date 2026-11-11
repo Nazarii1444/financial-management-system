@@ -9,6 +9,9 @@ Endpoints
   POST /logout              instructs client to discard tokens
   PATCH /password           change password (requires current password)
   POST /2fa/complete        finish login when requires_2fa=True
+  POST /password-reset/request   e-mail a 6-digit code (same answer for unknown e-mails)
+  POST /password-reset/verify    check the code (does not use it)
+  POST /password-reset/confirm   code + new password → password set, code burnt
 
 Passkey sign-in lives in `src/security/passkey_router.py` (/api/passkeys).
 Every sign-in and failed attempt on an existing account is written to the
@@ -21,6 +24,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request,
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.auth import password_reset
 from src.auth.auth_services import (
     authenticate_user,
     change_password,
@@ -28,20 +32,27 @@ from src.auth.auth_services import (
     create_user,
     needs_breach_recheck,
     refresh_password_health,
+    reset_password,
 )
 from src.auth.schemas import (
     LoginResponse,
     PasswordChangeRequest,
+    PasswordResetConfirm,
+    PasswordResetRequest,
+    PasswordResetVerify,
     RefreshRequest,
     TwoFACompleteRequest,
     TokenPair,
     UserCreate,
     UserLogin,
 )
-from src.config import logger
+from src.config import FRONTEND_URL, PASSWORD_RESET_CODE_TTL_MINUTES, logger
 from src.database import AsyncSessionLocal, get_db
 from src.dependencies import get_current_user
 from src.models import User
+from src.notifications import templates as email_templates
+from src.notifications.mailer import send_email
+from src.notifications.service import load_prefs
 from src.security.events import EventType, record_event
 from src.utils.exceptions import (
     email_already_registered_exception,
@@ -221,4 +232,76 @@ async def change_password_endpoint(
 
     await record_event(db, current_user.id_, EventType.PASSWORD_CHANGED, request)
     logger.info("Password changed for user id=%s", current_user.id_)
+    return {"message": "Password updated successfully"}
+
+
+# ── Password reset by e-mailed code ───────────────────────────────────────────
+
+_RESET_SENT = {"message": "If an account with this e-mail exists, a code has been sent"}
+
+
+@auth_router.post("/password-reset/request", status_code=status.HTTP_200_OK)
+async def request_password_reset(
+    payload: PasswordResetRequest,
+    request: Request,
+    background: BackgroundTasks,
+    db: AsyncSession = Depends(get_db),
+):
+    """E-mail a reset code. The answer is the same whether or not the e-mail is registered."""
+    user = await get_user_by_email(db, payload.email.strip().lower())
+    if user:
+        code = await password_reset.issue_code(db, user)
+        if code:
+            await record_event(db, user.id_, EventType.PASSWORD_RESET_REQUESTED, request)
+            background.add_task(send_email, email_templates.password_reset_code(
+                to=user.email, name=user.username, code=code, ttl_minutes=PASSWORD_RESET_CODE_TTL_MINUTES,
+                lang=payload.lang, frontend_url=FRONTEND_URL,
+            ))
+            logger.info("Password reset code issued for user id=%s", user.id_)
+        else:
+            logger.info("Password reset request rate-limited for user id=%s", user.id_)
+    return _RESET_SENT
+
+
+async def _checked_code(db: AsyncSession, payload: PasswordResetVerify, request: Request):
+    user = await get_user_by_email(db, payload.email.strip().lower())
+    try:
+        row = await password_reset.check_code(db, user, payload.code.strip())
+    except password_reset.ResetError as exc:
+        if user:
+            await record_event(db, user.id_, EventType.PASSWORD_RESET, request, success=False,
+                               details={"reason": str(exc)})
+        raise HTTPException(status_code=400, detail=str(exc))
+    return user, row
+
+
+@auth_router.post("/password-reset/verify", status_code=status.HTTP_200_OK)
+async def verify_password_reset(payload: PasswordResetVerify, request: Request, db: AsyncSession = Depends(get_db)):
+    """Check the code; it stays valid for the confirm step."""
+    await _checked_code(db, payload, request)
+    return {"message": "Code is valid"}
+
+
+@auth_router.post("/password-reset/confirm", status_code=status.HTTP_200_OK)
+async def confirm_password_reset(
+    payload: PasswordResetConfirm,
+    request: Request,
+    background: BackgroundTasks,
+    db: AsyncSession = Depends(get_db),
+):
+    """Set the new password. 2FA stays on: the next sign-in still asks for the TOTP code."""
+    user, row = await _checked_code(db, payload, request)
+    try:
+        await reset_password(db, user, payload.new_password)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    await password_reset.consume(db, row)
+    await db.commit()
+
+    await record_event(db, user.id_, EventType.PASSWORD_RESET, request)
+    background.add_task(send_email, email_templates.password_changed(
+        to=user.email, name=user.username, when=datetime.now(timezone.utc),
+        lang=(await load_prefs(db, [user.id_]))[user.id_].language, frontend_url=FRONTEND_URL,
+    ))
+    logger.info("Password reset completed for user id=%s", user.id_)
     return {"message": "Password updated successfully"}

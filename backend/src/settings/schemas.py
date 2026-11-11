@@ -1,4 +1,4 @@
-from typing import Optional, List
+from typing import Literal, Optional, List
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 from src.models import SubscriptionPlan
 
@@ -42,6 +42,7 @@ class NotificationPreferencesUpdate(BaseModel):
     recurring_reminders: Optional[bool] = None
     goal_milestone_alerts: Optional[bool] = None
     monthly_summary: Optional[bool] = None
+    language: Optional[Literal["uk", "en"]] = None   # language of notification e-mails
 
 
 class NotificationPreferencesOut(BaseModel):
@@ -52,6 +53,7 @@ class NotificationPreferencesOut(BaseModel):
     recurring_reminders: bool
     goal_milestone_alerts: bool
     monthly_summary: bool
+    language: str
 
 
 class SubscriptionFeature(BaseModel):

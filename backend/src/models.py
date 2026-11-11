@@ -238,6 +238,9 @@ class NotificationPreferences(Base):
     goal_milestone_alerts = Column(Boolean, nullable=False, default=True) # 25 / 50 / 75 / 100 % goal
     monthly_summary = Column(Boolean, nullable=False, default=True)       # end-of-month digest
 
+    # Language of notification emails ("uk" | "en")
+    language = Column(String(8), nullable=False, default="uk", server_default="uk")
+
     user = relationship("User", back_populates="notification_preferences")
 
 
@@ -417,6 +420,40 @@ class WebAuthnCredential(Base):
     last_used_at = Column(DateTime(timezone=True), nullable=True)
 
     user = relationship("User", back_populates="passkeys")
+
+
+class PasswordResetCode(Base):
+    """
+    One-time 6-digit code e-mailed for a password reset (`/api/auth/password-reset/*`).
+    Only an HMAC of the code is stored. A new request expires the previous codes;
+    a code dies after `expires_at`, after use, or after 5 wrong attempts.
+    """
+    __tablename__ = "password_reset_codes"
+    __table_args__ = (Index("ix_password_reset_codes_user_id_created_at", "user_id", "created_at"),)
+
+    id_ = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id_", ondelete="CASCADE"), nullable=False)
+    code_hash = Column(String(64), nullable=False)
+    attempts = Column(SmallInteger, nullable=False, default=0, server_default="0")
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    expires_at = Column(DateTime(timezone=True), nullable=False)
+    used_at = Column(DateTime(timezone=True), nullable=True)
+
+
+class SentNotification(Base):
+    """
+    Notification e-mails already sent (src/notifications). The unique (user_id, key) pair
+    makes every notification at-most-once even when the scheduler runs on several workers:
+    the key names the event, e.g. "budget:7:2026-11:85" or "recurring:3:2026-11-09".
+    """
+    __tablename__ = "sent_notifications"
+    __table_args__ = (UniqueConstraint("user_id", "key", name="uq_sent_notifications_user_key"),)
+
+    id_ = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id_", ondelete="CASCADE"), nullable=False)
+    kind = Column(String(32), nullable=False)    # recurring_reminder | budget_alert | goal_milestone | monthly_summary
+    key = Column(String(128), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
 
 class WebAuthnChallenge(Base):

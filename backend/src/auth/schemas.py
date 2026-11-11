@@ -43,6 +43,20 @@ class PasswordChangeRequest(BaseModel):
     new_password: str = Field(max_length=256)
 
 
+class PasswordResetRequest(BaseModel):
+    email: EmailStr
+    lang: Optional[str] = Field(default=None, max_length=8)   # language of the e-mail: uk | en
+
+
+class PasswordResetVerify(BaseModel):
+    email: EmailStr
+    code: str = Field(min_length=1, max_length=16)
+
+
+class PasswordResetConfirm(PasswordResetVerify):
+    new_password: str = Field(max_length=256)
+
+
 class TwoFACompleteRequest(BaseModel):
     """Sent after login when requires_2fa=True."""
     temp_token: str

@@ -10,6 +10,8 @@ const DETAIL_MAP: [string, (t: Translations) => string][] = [
   ['same as current email', (t) => t.errors.sameEmail],
   ['Current password is incorrect', (t) => t.errors.wrongCurrentPassword],
   ['Invalid 2FA code', (t) => t.errors.invalid2fa],
+  ['Invalid or expired code', (t) => t.errors.resetCodeInvalid],
+  ['Too many attempts', (t) => t.errors.resetTooManyAttempts],
   ['2FA session token', (t) => t.errors.twoFaSessionExpired],
   ['2FA is already enabled', (t) => t.errors.twoFaAlreadyEnabled],
   ['2FA is not enabled', (t) => t.errors.twoFaNotEnabled],

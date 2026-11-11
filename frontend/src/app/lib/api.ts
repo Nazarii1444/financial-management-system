@@ -248,9 +248,9 @@ export const authApi = {
   logout: () => post<{ message: string }>('/auth/logout'),
   changePassword: (current_password: string, new_password: string) =>
     patch<{ message: string }>('/auth/password', { current_password, new_password }),
-  // Not implemented on the backend yet — see docs/INTEGRATION_GAPS.md
-  requestPasswordReset: (email: string) =>
-    request<void>('/auth/password-reset/request', { method: 'POST', body: { email }, auth: false }),
+  // The server e-mails a 6-digit code (in `lang`); the answer is the same for unknown e-mails
+  requestPasswordReset: (email: string, lang?: string) =>
+    request<void>('/auth/password-reset/request', { method: 'POST', body: { email, lang }, auth: false }),
   verifyPasswordReset: (email: string, code: string) =>
     request<void>('/auth/password-reset/verify', { method: 'POST', body: { email, code }, auth: false }),
   confirmPasswordReset: (email: string, code: string, new_password: string) =>

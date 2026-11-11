@@ -10,6 +10,7 @@ import { useLanguage } from '../i18n/LanguageContext';
 import { LanguageSelector } from '../components/auth/LanguageSelector';
 import { authApi, ApiError } from '../lib/api';
 import { errorMessage } from '../lib/errors';
+import { PasswordStrengthMeter } from '../components/security/PasswordStrengthMeter';
 
 export function ResetPassword() {
   const [showPassword, setShowPassword] = useState(false);
@@ -25,11 +26,9 @@ export function ResetPassword() {
   const email: string = location.state?.email || '';
   const code: string = location.state?.code || '';
 
-  const validatePassword = (password: string): boolean => {
-    // Mirrors backend check_password_strength: 8+ chars, upper, lower, digit, special
-    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&]).{8,}$/;
-    return passwordRegex.test(password);
-  };
+  // Server rules (src/security/password_policy.py) via the live meter; the leak check runs on submit
+  const [passwordAcceptable, setPasswordAcceptable] = useState<boolean | null>(null);
+  const validatePassword = (password: string): boolean => password.length >= 10 && passwordAcceptable !== false;
 
   const validateForm = (): boolean => {
     const newErrors: { password?: string; confirmPassword?: string } = {};
@@ -72,23 +71,6 @@ export function ResetPassword() {
     }
   };
 
-  // Password strength indicator
-  const getPasswordStrength = (password: string): { strength: string; color: string; width: string } => {
-    if (!password) return { strength: '', color: '', width: '0%' };
-    
-    let strength = 0;
-    if (password.length >= 8) strength++;
-    if (/[a-z]/.test(password)) strength++;
-    if (/[A-Z]/.test(password)) strength++;
-    if (/\d/.test(password)) strength++;
-    if (/[^a-zA-Z0-9]/.test(password)) strength++;
-
-    if (strength <= 2) return { strength: t.auth.weak, color: 'bg-red-500', width: '33%' };
-    if (strength <= 3) return { strength: t.auth.medium, color: 'bg-yellow-500', width: '66%' };
-    return { strength: t.auth.strong, color: 'bg-green-500', width: '100%' };
-  };
-
-  const passwordStrength = getPasswordStrength(password);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center p-4 relative">
@@ -154,27 +136,8 @@ export function ResetPassword() {
                   </button>
                 </div>
                 
-                {/* Password Strength Indicator */}
-                {password && !errors.password && (
-                  <div className="space-y-1">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-gray-500">{t.auth.passwordStrength}</span>
-                      <span className={`font-medium ${
-                        passwordStrength.strength === t.auth.strong ? 'text-green-600' :
-                        passwordStrength.strength === t.auth.medium ? 'text-yellow-600' :
-                        'text-red-600'
-                      }`}>
-                        {passwordStrength.strength}
-                      </span>
-                    </div>
-                    <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
-                      <div
-                        className={`h-full ${passwordStrength.color} transition-all duration-300`}
-                        style={{ width: passwordStrength.width }}
-                      />
-                    </div>
-                  </div>
-                )}
+                {/* Same live meter as on sign-up */}
+                <PasswordStrengthMeter password={password} email={email} onResult={setPasswordAcceptable} />
 
                 {errors.password ? (
                   <p className="text-sm text-red-600 flex items-center gap-1">
@@ -187,11 +150,7 @@ export function ResetPassword() {
                     </svg>
                     {errors.password}
                   </p>
-                ) : (
-                  <p className="text-xs text-gray-500">
-                    {t.auth.passwordRequirements}
-                  </p>
-                )}
+                ) : null}
               </div>
 
               <div className="space-y-2">

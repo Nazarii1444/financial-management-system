@@ -23,6 +23,8 @@ class EventType:
     SIGNUP = "signup"
     LOGOUT = "logout"
     PASSWORD_CHANGED = "password_changed"
+    PASSWORD_RESET_REQUESTED = "password_reset_requested"   # code e-mailed
+    PASSWORD_RESET = "password_reset"                        # success=False: wrong / expired code
     EMAIL_CHANGED = "email_changed"
     TWOFA_ENABLED = "twofa_enabled"
     TWOFA_DISABLED = "twofa_disabled"

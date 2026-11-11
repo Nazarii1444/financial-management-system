@@ -34,6 +34,7 @@ from src.calendar_export.calendar_router import calendar_router
 from src.exports.export_router import export_router
 from src.security.security_router import security_router
 from src.security.passkey_router import passkey_router
+from src.notifications.service import register_notification_cron
 
 from src.database import get_db
 from src.config import IS_PRODUCTION, SESSION_SECRET, logger, origins
@@ -51,6 +52,7 @@ app.add_middleware(
 register_currency_cron(app)
 register_recurring_cron(app)
 register_trash_cron(app)
+register_notification_cron(app)
 
 
 @app.on_event("startup")

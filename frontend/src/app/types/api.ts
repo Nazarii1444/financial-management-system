@@ -291,6 +291,8 @@ export interface NotificationPreferences {
   recurring_reminders: boolean;
   goal_milestone_alerts: boolean;
   monthly_summary: boolean;
+  /** Language of notification e-mails */
+  language: 'uk' | 'en';
 }
 
 export interface SubscriptionOut {

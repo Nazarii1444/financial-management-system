@@ -1,8 +1,9 @@
 #!/bin/sh
 set -e
 
-# Create tables from the models (no Alembic migrations in the repo yet)
-python -m scripts.init_db
+# Bring the schema to the latest Alembic revision (also adopts databases that
+# scripts/init_db created before migrations were wired in — see scripts/migrate.py)
+python -m scripts.migrate
 
 # Demo data on first start; the seed script skips users that already exist
 if [ "${SEED_DATA:-false}" = "true" ]; then

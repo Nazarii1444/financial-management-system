@@ -289,7 +289,7 @@ function NotificationsTab() {
   const { t } = useLanguage();
   const prefs = useApi(() => settingsApi.notifications(), []);
 
-  const rows: { key: keyof NotificationPreferences; title: string; desc: string }[] = [
+  const rows: { key: Exclude<keyof NotificationPreferences, 'language'>; title: string; desc: string }[] = [
     { key: 'email_enabled', title: t.settings.notifications.email, desc: t.settings.notifications.emailDesc },
     { key: 'push_enabled', title: t.settings.notifications.push, desc: t.settings.notifications.pushDesc },
     { key: 'budget_limit_alerts', title: t.settings.notifications.budgetAlerts, desc: t.settings.notifications.budgetAlertsDesc },
@@ -298,12 +298,12 @@ function NotificationsTab() {
     { key: 'monthly_summary', title: t.settings.notifications.monthlyReports, desc: t.settings.notifications.monthlyReportsDesc },
   ];
 
-  const toggle = async (key: keyof NotificationPreferences, value: boolean) => {
+  const save = async (change: Partial<NotificationPreferences>) => {
     if (!prefs.data) return;
     const previous = prefs.data;
-    prefs.setData({ ...previous, [key]: value }); // optimistic
+    prefs.setData({ ...previous, ...change }); // optimistic
     try {
-      prefs.setData(await settingsApi.updateNotifications({ [key]: value }));
+      prefs.setData(await settingsApi.updateNotifications(change));
       toast.success(t.settings.notifications.saved);
       notifyDataChanged(); // alerts in the top bar depend on these
     } catch (err) {
@@ -328,9 +328,24 @@ function NotificationsTab() {
                     <h4 className="font-medium text-gray-900">{row.title}</h4>
                     <p className="text-sm text-gray-500 mt-1">{row.desc}</p>
                   </div>
-                  <Switch checked={data[row.key]} onCheckedChange={(v) => toggle(row.key, v)} />
+                  <Switch checked={Boolean(data[row.key])} onCheckedChange={(v) => save({ [row.key]: v })} />
                 </div>
               ))}
+              <div className="flex items-center justify-between gap-4 pt-3 border-t border-gray-100">
+                <div>
+                  <h4 className="font-medium text-gray-900">{t.settings.notifications.emailLanguage}</h4>
+                  <p className="text-sm text-gray-500 mt-1">{t.settings.notifications.emailLanguageDesc}</p>
+                </div>
+                <Select value={data.language} onValueChange={(v) => save({ language: v as NotificationPreferences['language'] })}>
+                  <SelectTrigger className="w-40">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="uk">Українська</SelectItem>
+                    <SelectItem value="en">English</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           )}
         </AsyncBlock>

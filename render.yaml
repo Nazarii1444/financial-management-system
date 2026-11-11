@@ -61,6 +61,16 @@ services:
         value: database
       - key: MAX_RECEIPTS_PER_USER
         value: "5"
+      # E-mail (password reset + notifications). Render's free tier blocks outbound SMTP,
+      # so mail goes through Brevo's HTTPS API. EMAIL_FROM must be a sender verified in Brevo.
+      - key: EMAIL_BACKEND
+        value: brevo
+      - key: EMAIL_FROM
+        sync: false
+      - key: EMAIL_FROM_NAME
+        value: FinanceHub
+      - key: BREVO_API_KEY
+        sync: false
       # Optional OAuth sign-in
       - key: GOOGLE_CLIENT_ID
         sync: false

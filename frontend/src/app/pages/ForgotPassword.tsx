@@ -16,7 +16,7 @@ export function ForgotPassword() {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
 
   const validateEmail = (email: string): boolean => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -39,7 +39,7 @@ export function ForgotPassword() {
     setIsLoading(true);
     setError('');
     try {
-      await authApi.requestPasswordReset(email.trim().toLowerCase());
+      await authApi.requestPasswordReset(email.trim().toLowerCase(), language);
       toast.success(t.auth.resetCodeSent);
       navigate('/forgot-password/verify', { state: { email } });
     } catch (err) {

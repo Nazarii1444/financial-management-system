@@ -29,7 +29,7 @@ rejected with HTTP 409 until the user deletes one.
    Use the direct (non-pooled) string: asyncpg's prepared statements don't mix well with the PgBouncer pooler.
    The backend converts `sslmode`/`channel_binding` for asyncpg itself (`src/config.py`).
 
-Tables are created on every backend start (`scripts/init_db`), no manual migration needed.
+The schema is migrated on every backend start (`python -m scripts.migrate` → `alembic upgrade head`), no manual step needed.
 
 ## 2. Render (backend + frontend)
 
@@ -45,6 +45,19 @@ Tables are created on every backend start (`scripts/init_db`), no manual migrati
    `FRONTEND_URL`, `WEBAUTHN_RP_ID`, `PUBLIC_API_URL` (backend); `VITE_BACKEND_URL` and the `/api/*` rewrite (frontend) — and redeploy.
 6. Open `https://financehub.onrender.com`, register, log in.
    Backend health: `https://financehub-api.onrender.com/health/` · Swagger: `/docs`.
+
+## E-mail (password reset and notifications)
+
+Render's free web services can't open outbound SMTP connections, so mail goes through Brevo's HTTPS API:
+
+1. Sign up at <https://www.brevo.com> (free plan: 300 e-mails/day).
+2. **Senders, domains & dedicated IPs → Senders**: add and verify the address mails will come from (no own domain needed).
+3. **SMTP & API → API keys**: create a key.
+4. On the backend service set `EMAIL_FROM` (the verified sender) and `BREVO_API_KEY`; `EMAIL_BACKEND=brevo` is already in `render.yaml`.
+
+Without these, password-reset codes and notifications are only written to the service log (`EMAIL_BACKEND=console`).
+The notification scheduler runs hourly inside the backend, so while the free instance sleeps nothing is sent;
+the monthly summary has a one-week window and catches up after the next wake-up.
 
 ## OAuth sign-in (optional)
 

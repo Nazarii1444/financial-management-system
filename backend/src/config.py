@@ -142,6 +142,27 @@ MAX_RECEIPTS_PER_USER: int = int(os.getenv("MAX_RECEIPTS_PER_USER", "5"))
 # for hosts without a persistent disk such as Render's free tier
 FILE_STORAGE: str = os.getenv("FILE_STORAGE", "local").strip().lower()
 
+# ===== Email =====
+# "console" logs every email (local development: the password-reset code shows up in the log),
+# "brevo" sends through Brevo's HTTPS API (works on hosts that block outbound SMTP, e.g. Render's
+# free tier), "smtp" through any SMTP server.
+EMAIL_BACKEND: str = os.getenv("EMAIL_BACKEND", "console").strip().lower()
+EMAIL_FROM: str = os.getenv("EMAIL_FROM", "no-reply@financehub.local")
+EMAIL_FROM_NAME: str = os.getenv("EMAIL_FROM_NAME", "FinanceHub")
+BREVO_API_KEY: str = os.getenv("BREVO_API_KEY", "")
+SMTP_HOST: str = os.getenv("SMTP_HOST", "")
+SMTP_PORT: int = int(os.getenv("SMTP_PORT", "587"))
+SMTP_USERNAME: str = os.getenv("SMTP_USERNAME", "")
+SMTP_PASSWORD: str = os.getenv("SMTP_PASSWORD", "")
+# "starttls" (port 587), "ssl" (port 465) or "none"
+SMTP_SECURITY: str = os.getenv("SMTP_SECURITY", "starttls").strip().lower()
+PASSWORD_RESET_CODE_TTL_MINUTES: int = int(os.getenv("PASSWORD_RESET_CODE_TTL_MINUTES", "15"))
+# Hourly scheduler for payment reminders, budget alerts and the monthly summary
+NOTIFICATIONS_ENABLED: bool = os.getenv("NOTIFICATIONS_ENABLED", "true").lower() in ("1", "true", "yes")
+
+if IS_PRODUCTION and EMAIL_BACKEND == "console":
+    logger.warning("EMAIL_BACKEND=console in production: emails (password reset, notifications) are only logged")
+
 # ===== Github =====
 GITHUB_CLIENT_ID = os.getenv("GITHUB_CLIENT_ID")
 GITHUB_CLIENT_SECRET = os.getenv("GITHUB_CLIENT_SECRET")
