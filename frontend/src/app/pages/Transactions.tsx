@@ -315,7 +315,7 @@ export function Transactions() {
           <div className="flex flex-wrap items-center gap-3 text-sm">
             <label className="flex items-center gap-2 text-gray-600">
               {t.history.month}
-              <Input type="month" className="w-[160px]" value={month} onChange={(e) => pickMonth(e.target.value)} />
+              <Input type="month" className="w-auto" value={month} onChange={(e) => pickMonth(e.target.value)} />
             </label>
             <label className="flex items-center gap-2 text-gray-600">
               {t.transactions.from}

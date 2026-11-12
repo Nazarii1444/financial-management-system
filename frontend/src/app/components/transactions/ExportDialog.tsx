@@ -132,7 +132,7 @@ export function ExportDialog({ open, onOpenChange, filters, matchCount, month: i
               <Label htmlFor="report-month" className="text-sm text-gray-600">
                 {t.history.reportMonth}
               </Label>
-              <Input id="report-month" type="month" className="w-[160px]" value={month} onChange={(e) => e.target.value && setMonth(e.target.value)} />
+              <Input id="report-month" type="month" className="w-auto" value={month} onChange={(e) => e.target.value && setMonth(e.target.value)} />
             </div>
           </div>
           <div className="space-y-2">
